@@ -13,10 +13,6 @@ const ART = (() => {
   function flash(c) { return memo(c, () => tint(c, 'rgba(255,255,255,0.85)')); }
 
   const FILES = {
-    pipoya: ['base', 'grass', 'path', 'water', 'cavewater', 'tallgrass', 'wallup', 'wallup2', 'dirt'],
-    'pipoya/houses': ['cottage', 'shop', 'forge', 'inn', 'stone', 'stall'],
-    'pipoya/chars': ['wren', 'bram', 'tamsin', 'gran', 'pell', 'rosa', 'pip', 'ivy', 'marta', 'dorrit', 'odo'],
-    monsters: ['slime', 'squirrel', 'wasp', 'worm', 'mushroom', 'turtle', 'moth', 'ghost', 'wraith'],
     icons: ['herb', 'tonic', 'plume', 'berry', 'weapon', 'armor', 'trinket', 'gold'],
     fx: ['ember', 'bloom', 'gale', 'hush', 'smoke', 'heal', 'slash', 'leaf', 'leafpink'],
     ui: ['panel', 'panel_dark', 'faceframe', 'arrow'],
@@ -124,7 +120,7 @@ const ART = (() => {
   const DIRROW = { down: 0, left: 1, right: 2, up: 3 };
   const FCOL = [1, 0, 1, 2, 0];
   function charSprite(look, dir, frame) { return crop('pipoya/chars/' + look.sheet, FCOL[(frame | 0) % 5] * 32, DIRROW[dir] * 32, 32, 32); }
-  function portrait(look) { return memo('pt|' + look.sheet, () => { const [c, g] = mk(38, 38); g.drawImage(IMG['pipoya/chars/' + look.sheet], 32 + 6, 0, 19, 19, 0, 0, 38, 38); return c; }); }
+  function portrait(look) { return window.W3D.portrait(look.sheet); }
   function enemySprite(shape, frame, fl) {
     const im = IMG['monsters/' + shape], c = crop('monsters/' + shape, 0, 0, im.width, im.height);
     return fl ? flash(c) : c;

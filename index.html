@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rootwell">
-<meta name="description" content="Rootwell: a cozy pixel-art adventure RPG. Explore Mossbell Vale, solve puzzles with your tools, and wake the singing spring.">
+<meta name="description" content="Rootwell: a cozy 3D adventure RPG. Explore Mossbell Vale, solve puzzles with your tools, and wake the singing spring.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -23,8 +23,10 @@
   #app { position: fixed; inset: 0; display: flex; flex-direction: column;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   #screen { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding-top: 4px; }
-  #game { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; border-radius: 4px;
+  #stage { position: relative; border-radius: 4px; overflow: hidden; background: #000;
     box-shadow: 0 0 0 2px #3a2a5a, 0 0 0 4px #1a1028, 0 10px 30px rgba(0,0,0,.6); }
+  #gl { position: absolute; left: 0; top: 0; display: block; }
+  #game { position: relative; display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: transparent; }
   #controls { position: relative; flex: 1 1 auto; min-height: 176px; }
   #stick { position: absolute; left: 6%; top: 50%; transform: translateY(-50%); width: 150px; height: 150px; touch-action: none; }
   #stick .base { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #3a2e5e, #241c40 70%);
@@ -57,7 +59,7 @@
 </head>
 <body>
 <div id="app">
-  <div id="screen"><canvas id="game" width="864" height="576"></canvas></div>
+  <div id="screen"><div id="stage"><canvas id="gl"></canvas><canvas id="game" width="864" height="576"></canvas></div></div>
   <div id="controls">
     <div id="stick"><div class="base"></div><div class="knob"></div></div>
     <div id="btns">
@@ -68,6 +70,8 @@
     </div>
   </div>
 </div>
+<script>window.W3DReady = new Promise((r) => (window.__w3dReady = r));</script>
+<script type="module" src="world3d.js"></script>
 <script src="art.js"></script>
 <script src="data.js"></script>
 <script src="game.js"></script>

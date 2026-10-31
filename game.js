@@ -39,6 +39,7 @@ function resize() {
   if (ch > ah) { ch = ah; cw = (ch * W) / H; }
   if (!land) scr.style.height = Math.ceil(ch + 12) + 'px';
   cvs.style.width = cw + 'px'; cvs.style.height = ch + 'px';
+  if (window.W3D) W3D.resize(cw, ch, W, H);
   const dpr = window.devicePixelRatio || 1;
   S = Math.max(1, Math.min(8, Math.ceil((cw * dpr) / W)));
   if (cvs.width !== W * S || cvs.height !== H * S) { cvs.width = W * S; cvs.height = H * S; }
@@ -481,6 +482,7 @@ function loadMap(id) {
   for (let y = 0; y < cur.h; y++) for (let x = 0; x < cur.w; x++) cur.mask[y][x] = maskAt(x, y);
   syncNpcs();
   fx.length = 0;
+  if (window.W3D) { W3D.buildMap(cur, state); W3D.resetCamera(); }
   encSteps = def.encTall ? ri(4, 10) : ri(10, 20);
   music(def.music);
   if (def.outdoor) for (let i = 0; i < 3; i++) cur.clouds.push({ x: rand(0, cur.w * TS), y: rand(0, cur.h * TS), r: rand(60, 110) });
@@ -520,6 +522,7 @@ function syncNpcs() {
 function tileAt(x, y) { if (x < 0 || y < 0 || x >= cur.w || y >= cur.h) return ' '; return cur.t[y][x]; }
 function setTile(x, y, c) {
   cur.t[y][x] = c; (state.mods[cur.id] = state.mods[cur.id] || {})[x + ',' + y] = c;
+  if (window.W3D) W3D.tileChanged(cur, state);
   for (let yy = y - 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + 1; xx++) if (xx >= 0 && yy >= 0 && xx < cur.w && yy < cur.h) cur.mask[yy][xx] = maskAt(xx, yy);
 }
 function npcAt(x, y) { return cur.npcs.find((n) => (n.x === x && n.y === y) || (n.moving && n.fx === x && n.fy === y)); }
@@ -633,7 +636,8 @@ function findPath(tx, ty, adjacentOk) {
 function dirTo(x0, y0, x1, y1) { return x1 > x0 ? 'right' : x1 < x0 ? 'left' : y1 > y0 ? 'down' : 'up'; }
 function tapMap(lx, ly) {
   const { cx, cy } = camera();
-  const tx = Math.floor((lx / ZM + cx) / TS), ty = Math.floor((ly / ZM + cy) / TS);
+  const pt = W3D.pickTile(lx, ly); if (!pt) return;
+  const tx = pt.x, ty = pt.y;
   if (tx < 0 || ty < 0 || tx >= cur.w || ty >= cur.h) return;
   if (tx === P.x && ty === P.y) { interact(); return; }
   const c = tileAt(tx, ty);
@@ -756,88 +760,28 @@ async function usePower(p, x, y) {
 function bshadow(cx, cy, rx) { bx.fillStyle = 'rgba(20,10,30,0.25)'; bx.beginPath(); bx.ellipse(Math.round(cx), Math.round(cy), rx, Math.max(2, rx * 0.35), 0, 0, 6.3); bx.fill(); }
 function heroFrame(moving, anim) { return moving ? [1, 2, 3, 0][Math.floor(anim / 120) % 4] : 0; }
 function lookOfNpc(n) { return PEOPLE[n.who] ? PEOPLE[n.who].look : PEOPLE.pell.look; }
+let lastMapT = 0;
 function renderMap() {
-  bx = wbx; bx.imageSmoothingEnabled = false; ZM = WZ; VW = WW; VH = WH;
-  bx.fillStyle = cur.def.ground === 'W' ? '#151a1a' : '#0a0612'; bx.fillRect(0, 0, VW, VH);
-  const { cx, cy, px, py } = camera();
-  const x0 = Math.max(0, Math.floor(cx / TS) - 2), y0 = Math.max(0, Math.floor(cy / TS) - 1);
-  const x1 = Math.min(cur.w - 1, Math.floor((cx + VW) / TS) + 2), y1 = Math.min(cur.h - 1, Math.floor((cy + VH) / TS) + 3);
-  const gr = cur.def.ground, lit = state.flags.springSings;
-  const sprites = [];
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const c = cur.t[y][x], v = hash(x, y) % 8;
-    bx.drawImage(ART.drawTile(c, { v, mask: cur.mask[y][x], ground: gr, k: tileK(x, y, c) }), x * TS - cx, y * TS - cy);
-    const pn = PROPS[c];
-    if (pn) sprites.push({ y: y * TS + TS - 1, draw: () => {
-      const im = c === 'L' ? ART.prop(lit ? 'springLit' : 'spring') : ART.prop(pn, c === 'T' ? hash(x, y + 7) : v);
-      const sx = x * TS - cx + Math.round((TS - im.width) / 2), sy = y * TS - cy + TS - im.height + (PROP_DY[c] || 0);
-      if (c === 'T' || c === 'O' || c === 't') bshadow(x * TS - cx + HT, y * TS - cy + TS - 3, c === 'T' ? 18 : 12);
-      else if (!NO_SHADOW.has(c)) bshadow(x * TS - cx + HT, y * TS - cy + TS - 3, 10);
-      bx.drawImage(im, sx, sy);
-    } });
-    if (c === '"') sprites.push({ y: y * TS + TS - 0.4, draw: () => bx.drawImage(ART.prop('tuft'), x * TS - cx, y * TS - cy) });
-  }
-  for (const h of cur.def.houses || []) {
-    const im = ART.house(h.kind);
-    sprites.push({ y: h.y * TS + im.height - 1, draw: () => { bx.fillStyle = 'rgba(20,10,30,0.18)'; bx.fillRect(h.x * TS - cx + 4, h.y * TS - cy + im.height - 2, im.width - 4, 5); bx.drawImage(im, h.x * TS - cx, h.y * TS - cy); } });
-  }
-  if (cur.moving) {
-    const m = cur.moving; m.t = Math.min(1, m.t + 1 / 13);
-    bx.drawImage(ART.prop('boulder'), Math.round((m.x + (m.tx - m.x) * m.t) * TS - cx), Math.round((m.y + (m.ty - m.y) * m.t) * TS - cy));
-  }
-  const CY = 6; // characters stand slightly above the tile centre
-  for (const n of cur.npcs) {
-    const nx = (n.fx + (n.x - n.fx) * n.t) * TS, ny = (n.fy + (n.y - n.fy) * n.t) * TS;
-    sprites.push({ y: ny + TS - 1, draw: () => {
-      if (n.enemy) {
-        const im = ART.enemySprite(ENEMIES[n.enemy].shape, 0, false), w = Math.round(im.width * 0.8), h = Math.round(im.height * 0.8);
-        bx.globalAlpha = 0.92; bx.drawImage(im, Math.round(nx - cx + HT - w / 2), Math.round(ny - cy + TS - h + Math.sin(T / 400) * 3), w, h); bx.globalAlpha = 1;
-        return;
-      }
-      bshadow(nx - cx + HT, ny - cy + TS - 3, 9);
-      bx.drawImage(ART.charSprite(lookOfNpc(n), n.dir, n.moving ? heroFrame(true, n.anim) : 0), Math.round(nx - cx), Math.round(ny - cy - CY));
-    } });
-  }
-  for (const w of cur.def.trinkets || []) {
-    if (w.id in state.trinkets) continue;
-    sprites.push({ y: w.y * TS + TS - 2, draw: () => {
-      const wx = w.x * TS - cx + HT, wy = w.y * TS - cy + HT + Math.round(Math.sin(T / 260) * 2);
-      bshadow(wx, w.y * TS - cy + TS - 4, 6);
-      const ic = ART.icon('trinket'); bx.drawImage(ic, Math.round(wx - ic.width), Math.round(wy - ic.height), ic.width * 2, ic.height * 2);
-      const st = Math.floor(T / 150) % 4;
-      bx.fillStyle = '#fff8d0'; bx.fillRect(wx - 10 + st * 5, wy - 12, 2, 2); bx.fillRect(wx + 9 - st * 2, wy + 6, 2, 2);
-    } });
-  }
-  const party = state.party;
-  for (let i = party.length - 1; i >= 1; i--) {
-    const a = P.hist[i + 1] || P.hist[P.hist.length - 1], b = P.hist[i] || a;
-    const t = P.moving ? P.t : 1;
-    const fxp = (a.x + (b.x - a.x) * t) * TS, fyp = (a.y + (b.y - a.y) * t) * TS;
-    if (Math.abs(fxp - px) < 8 && Math.abs(fyp - py) < 8) continue;
-    const mv = b.x !== a.x || b.y !== a.y;
-    const dir = mv ? dirTo(a.x, a.y, b.x, b.y) : (P.hist[i - 1] ? dirTo(b.x, b.y, P.hist[i - 1].x, P.hist[i - 1].y) : P.dir);
-    sprites.push({ y: fyp + TS - 1.1 - i * 0.01, draw: () => { bshadow(fxp - cx + HT, fyp - cy + TS - 3, 9); bx.drawImage(ART.charSprite(HEROES[party[i].id].look, dir, P.moving && mv ? heroFrame(true, P.anim + i * 60) : 0), Math.round(fxp - cx), Math.round(fyp - cy - CY)); } });
-  }
-  sprites.push({ y: py + TS - 1, draw: () => { bshadow(px - cx + HT, py - cy + TS - 3, 9); bx.drawImage(ART.charSprite(HEROES[party[0].id].look, P.dir, heroFrame(P.moving, P.anim)), Math.round(px - cx), Math.round(py - cy - CY)); } });
-  sprites.sort((a, b) => a.y - b.y).forEach((sp) => sp.draw());
+  const dt = Math.min(50, T - (lastMapT || T)); lastMapT = T;
+  W3D.syncMap(dt, { cur, P, state, T, dirTo, running: held.b || stickRun });
+  bx.clearRect(0, 0, W, H);
+  const cx = (P.x - 7) * TS, cy = (P.y - 8) * TS; VW = 14 * TS; VH = 16 * TS;
   ambient(cx, cy);
   for (let i = fx.length - 1; i >= 0; i--) {
     const p = fx[i]; p.x += p.vx; p.y += p.vy; p.life -= p.amb ? 0.004 : 0.022;
     if (p.amb) p.vx += Math.sin(T / 600 + p.seed) * 0.004;
-    if (p.life <= 0 || p.x < cx - 40 || p.x > cx + VW + 40 || p.y < cy - 40 || p.y > cy + VH + 40) { fx.splice(i, 1); continue; }
-    bx.globalAlpha = Math.min(1, p.life * 1.5);
-    bx.fillStyle = p.col; bx.fillRect(Math.round(p.x - cx), Math.round(p.y - cy), (p.s || 1) + 1, (p.s || 1) + 1);
-    bx.globalAlpha = 1;
+    if (p.life <= 0 || p.x < cx - 60 || p.x > cx + VW + 60 || p.y < cy - 60 || p.y > cy + VH + 60) { fx.splice(i, 1); continue; }
+    const sp = W3D.toScreen(p.x / TS, p.amb ? 1.6 : 0.5, p.y / TS);
+    bx.globalAlpha = Math.min(1, p.life * 1.5); bx.fillStyle = p.col; bx.fillRect(Math.round(sp.x), Math.round(sp.y), (p.s || 1) + 1, (p.s || 1) + 1); bx.globalAlpha = 1;
   }
-  if (cur.def.outdoor) for (const c of cur.clouds) {
-    c.x += 0.1; if (c.x - c.r > cur.w * TS) c.x = -c.r;
-    bx.fillStyle = 'rgba(20,30,60,0.07)'; bx.beginPath(); bx.ellipse(c.x - cx, c.y - cy, c.r, c.r * 0.55, 0, 0, Math.PI * 2); bx.fill();
+  if (P.marker) {
+    const sp = W3D.toScreen(P.marker.x + 0.5, 0.05, P.marker.y + 0.5), r = 9 + Math.sin(T / 150) * 1.5;
+    bx.strokeStyle = 'rgba(255,242,192,0.9)'; bx.lineWidth = 1.5; bx.beginPath(); bx.ellipse(sp.x, sp.y, r, r * 0.55, 0, 0, 6.3); bx.stroke();
   }
-  if (cur.def.dark) drawDarkness(cx, cy, px, py);
-  if (P.marker) { const mx = P.marker.x * TS - cx, my = P.marker.y * TS - cy, st = Math.floor(T / 150) % 2; bx.strokeStyle = '#fff2c0'; bx.lineWidth = 1.5; bx.strokeRect(mx + 3 - st, my + 3 - st, TS - 6 + st * 2, TS - 6 + st * 2); }
   const f = !busy && !P.moving && !UI.dialog && !UI.menus.length && !P.path.length ? facingTarget() : null;
   if (f) {
-    const ox = f.x * TS - cx + HT, oy = f.y * TS - cy - (f.kind === 'talk' ? 14 : 4) + Math.round(Math.sin(T / 200));
+    const sp = W3D.toScreen(f.x + 0.5, f.kind === 'talk' ? 1.75 : 1.15, f.y + 0.5);
+    const ox = Math.round(sp.x), oy = Math.round(sp.y + Math.sin(T / 200));
     bx.fillStyle = OUTLINE_COL; bx.fillRect(ox - 8, oy - 8, 17, 13); bx.fillRect(ox - 2, oy + 5, 5, 3);
     bx.fillStyle = '#fff8e8'; bx.fillRect(ox - 7, oy - 7, 15, 11); bx.fillRect(ox - 1, oy + 4, 3, 3);
     if (f.kind === 'talk') { bx.fillStyle = '#3a2a4a'; for (const d of [-4, 0, 4]) bx.fillRect(ox + d - 1, oy - 2, 2, 2); }
@@ -845,7 +789,6 @@ function renderMap() {
     else { bx.fillStyle = '#e05a3a'; bx.fillRect(ox - 1, oy - 6, 2, 6); bx.fillRect(ox - 1, oy + 1, 2, 2); }
     setButtonHints(A_LABELS[f.kind], f.kind === 'power');
   } else setButtonHints('Action', false);
-  bx = bx0;
 }
 function ambient(cx, cy) {
   const kind = cur.def.ambient; if (!kind) return;
@@ -902,13 +845,14 @@ function drawMapHUD() {
 
 // ===================== BATTLE =====================
 function makeEnemy(id) {
-  const d = ENEMIES[id], sz = ART.enemySize(d.shape);
+  const d = ENEMIES[id], sz = { w: 40, h: 40 };
   return { id, d, sz, name: d.name, hp: d.hp, maxhp: d.hp, atk: d.atk, def: d.def, agi: d.agi, x: 0, y: 0, flash: 0, shake: 0, alive: true, dying: 0, lunge: 0 };
 }
 const bY = () => Math.round(H * 0.6) + 6;
-const BS = () => 2; // hero sprites are 32px (16 * BS)
-const heroPos = (i) => ({ x: (BS() === 3 ? 202 : 212) + i * (BS() === 3 ? 30 : 26), y: bY() - 10 + i * (BS() === 3 ? 18 : 11) });
-const enemyHit = (e) => ({ x: e.x, y: e.y - e.sz.h * 0.5 - (e.d.float ? 6 : 0) });
+let HERO_H = 40;
+const BS = () => HERO_H / 16; // floating numbers etc. are offset by the hero's on-screen height
+const heroPos = (i) => ({ x: 206 + i * 30, y: bY() - 14 + i * 18 });
+const enemyHit = (e) => ({ x: e.x, y: e.y - e.sz.h * 0.5 - (e.d.float ? 14 : 0) });
 function anim(name, x, y, sc = 2, ms = 60) { if (B) B.anims.push({ name, x, y, sc, ms, t: 0 }); }
 async function msg(t, ms = 650) { B.msg = t; await waitOrTap(ms + t.length * 12); }
 
@@ -922,7 +866,7 @@ async function fight(ids, opt = {}) {
     if (c === 0) continue;
     await fade(1);
     for (const m of state.party) { const s = stats(m); m.hp = s.hp; m.fp = s.fp; }
-    B = null; game.scene = 'map';
+    B = null; W3D.battleEnd(); game.scene = 'map';
     loadMap('inn'); placePlayer(4, 5, 'up');
     saveGame();
     await fade(0);
@@ -937,6 +881,7 @@ async function battle(ids, opt = {}) {
   B.enemies.forEach((e) => (cnt[e.id] = (cnt[e.id] || 0) + 1));
   B.enemies.forEach((e) => { if (cnt[e.id] > 1) { seen[e.id] = (seen[e.id] || 0) + 1; e.name += ' ' + 'ABC'[seen[e.id] - 1]; } });
   layoutEnemies();
+  HERO_H = W3D.battleStart(B, state.party, heroPos).heroH;
   sfx('encounter');
   UI.flashCol = '#fff';
   for (let i = 0; i < 2; i++) { UI.flash = 0.9; await sleep(130); }
@@ -964,7 +909,7 @@ async function battle(ids, opt = {}) {
   if (result === 'lose') { sfx('down'); await msg('The party has fallen...', 900); return 'lose'; }
   for (const m of state.party) { if (m.hp <= 0) m.hp = 1; clampHero(m); }
   await fade(1);
-  B = null; game.scene = 'map'; music(cur.def.music);
+  B = null; W3D.battleEnd(); game.scene = 'map'; music(cur.def.music);
   await fade(0);
   return result;
 }
@@ -1272,37 +1217,15 @@ function battleBg(kind) {
 const hurtCache = new Map();
 function hurtSprite(im) { let c = hurtCache.get(im); if (!c) { c = ART.tint(im, '#ff5a5a'); hurtCache.set(im, c); } return c; }
 function renderBattle(dt) {
-  const sh = B.shake > 0 ? [ri(-2, 2), ri(-1, 1)] : [0, 0];
+  bx.clearRect(0, 0, W, H);
   B.shake = Math.max(0, B.shake - dt);
-  bx.save(); bx.translate(sh[0], sh[1]);
-  bx.drawImage(battleBg(B.bg), 0, 0);
-  for (const e of B.enemies) {
-    e.flash = Math.max(0, e.flash - dt); e.shake = Math.max(0, e.shake - dt); e.lunge = Math.max(0, e.lunge - dt);
-    if (!e.alive) { e.dying = Math.max(0, e.dying - dt / 450); if (e.dying <= 0) continue; }
-    const fl = (e.flash > 0 && Math.floor(e.flash / 60) % 2 === 0) || !e.alive;
-    const im = ART.enemySprite(e.d.shape, 0, fl);
-    const br = e.d.float ? 0 : Math.sin(T / 260 + e.x) * 0.03, w = im.width, h = Math.round(im.height * (1 + br));
-    const ox = (e.shake > 0 ? Math.round(Math.sin(T / 14) * 2) : 0) + (e.lunge > 0 ? Math.round(Math.sin((e.lunge / 300) * Math.PI) * 14) : 0);
-    const oy = e.d.float ? Math.round(Math.sin(T / 300 + e.x) * 3) - 6 : 0;
-    bx.fillStyle = 'rgba(10,0,20,0.28)'; bx.beginPath(); bx.ellipse(e.x, e.y - 1, w * 0.34, 4, 0, 0, 6.3); bx.fill();
-    bx.globalAlpha = e.alive ? 1 : e.dying;
-    bx.drawImage(im, Math.round(e.x - w / 2 + ox), Math.round(e.y - h + 2 + oy), w, h);
-    bx.globalAlpha = 1;
-  }
+  for (const e of B.enemies) { e.flash = Math.max(0, e.flash - dt); e.shake = Math.max(0, e.shake - dt); e.lunge = Math.max(0, e.lunge - dt); if (!e.alive) e.dying = Math.max(0, e.dying - dt / 450); }
+  W3D.battleSync(dt, B, state.party, T);
   state.party.forEach((m, i) => {
-    const p = heroPos(i), shk = B.heroShake[m.id] || 0, st = B.heroStep[m.id] || 0;
-    B.heroShake[m.id] = Math.max(0, shk - dt); B.heroStep[m.id] = Math.max(0, st - dt);
-    const x = p.x + (shk > 0 ? Math.round(Math.sin(T / 14) * 2) + 3 : 0) - (st > 0 ? Math.round(Math.sin((st / 380) * Math.PI) * 16) : 0);
-    let y = p.y;
-    if (B.active === i) y -= Math.round(Math.abs(Math.sin(T / 160)) * 3);
-    bx.fillStyle = 'rgba(10,0,20,0.28)'; bx.beginPath(); bx.ellipse(x, y - 1, 5 * BS(), 3, 0, 0, 6.3); bx.fill();
-    let im = ART.charSprite(HEROES[m.id].look, 'left', st > 0 ? 4 : B.active === i ? Math.floor(T / 200) % 4 : 0);
-    if (shk > 0 && Math.floor(shk / 80) % 2 === 0) im = hurtSprite(im);
-    const hs = 16 * BS();
-    if (m.hp <= 0) { bx.globalAlpha = 0.55; bx.save(); bx.translate(x, y - hs / 4); bx.rotate(-Math.PI / 2); bx.drawImage(im, -hs / 2, -hs / 2, hs, hs); bx.restore(); bx.globalAlpha = 1; }
-    else bx.drawImage(im, x - hs / 2, y - hs + 1, hs, hs);
-    if (B.guard[m.id]) { bx.strokeStyle = 'rgba(150,220,255,0.8)'; bx.lineWidth = 1; bx.beginPath(); bx.arc(x, y - hs / 2, hs * 0.6, 0, 6.3); bx.stroke(); }
-    if (B.allyTarget === m) { const b = Math.round(Math.sin(T / 120) * 2), ay = y - hs - 10 + b; bx.fillStyle = OUTLINE_COL; bx.fillRect(x - 5, ay - 1, 11, 4); bx.fillStyle = '#ffd36a'; bx.fillRect(x - 4, ay, 9, 2); bx.fillRect(x - 2, ay + 2, 5, 1); bx.fillRect(x - 1, ay + 3, 3, 1); bx.fillRect(x, ay + 4, 1, 1); }
+    B.heroShake[m.id] = Math.max(0, (B.heroShake[m.id] || 0) - dt); B.heroStep[m.id] = Math.max(0, (B.heroStep[m.id] || 0) - dt);
+    const p = heroPos(i);
+    if (B.guard[m.id]) { bx.strokeStyle = 'rgba(150,220,255,0.8)'; bx.lineWidth = 1.5; bx.beginPath(); bx.ellipse(p.x, p.y - HERO_H * 0.45, HERO_H * 0.5, HERO_H * 0.62, 0, 0, 6.3); bx.stroke(); }
+    if (B.allyTarget === m) { const b = Math.round(Math.sin(T / 120) * 2), ay = p.y - HERO_H - 10 + b; bx.fillStyle = OUTLINE_COL; bx.fillRect(p.x - 5, ay - 1, 11, 4); bx.fillStyle = '#ffd36a'; bx.fillRect(p.x - 4, ay, 9, 2); bx.fillRect(p.x - 2, ay + 2, 5, 1); bx.fillRect(p.x - 1, ay + 3, 3, 1); bx.fillRect(p.x, ay + 4, 1, 1); }
   });
   for (let i = B.anims.length - 1; i >= 0; i--) {
     const a = B.anims[i]; a.t += dt;
@@ -1316,15 +1239,14 @@ function renderBattle(dt) {
     if (p.life <= 0) { B.fx.splice(i, 1); continue; }
     bx.globalAlpha = Math.min(1, p.life * 1.6); bx.fillStyle = p.col; bx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s); bx.globalAlpha = 1;
   }
-  if (B.target && B.target.alive) { const e = B.target, b = Math.round(Math.sin(T / 120) * 2), yy = e.y - e.sz.h - 8 - (e.d.float ? 6 : 0) + b; bx.fillStyle = OUTLINE_COL; bx.fillRect(e.x - 5, yy - 1, 11, 4); bx.fillStyle = '#ffd36a'; bx.fillRect(e.x - 4, yy, 9, 2); bx.fillRect(e.x - 2, yy + 2, 5, 1); bx.fillRect(e.x - 1, yy + 3, 3, 1); bx.fillRect(e.x, yy + 4, 1, 1); }
-  bx.restore();
+  if (B.target && B.target.alive) { const e = B.target, b = Math.round(Math.sin(T / 120) * 2), yy = e.y - e.sz.h - 10 - (e.d.float ? 14 : 0) + b; bx.fillStyle = OUTLINE_COL; bx.fillRect(e.x - 5, yy - 1, 11, 4); bx.fillStyle = '#ffd36a'; bx.fillRect(e.x - 4, yy, 9, 2); bx.fillRect(e.x - 2, yy + 2, 5, 1); bx.fillRect(e.x - 1, yy + 3, 3, 1); bx.fillRect(e.x, yy + 4, 1, 1); }
   if (B.cutin) {
     B.cutin.t += dt; const t = B.cutin.t, pt = ART.portrait(B.cutin.look);
     const slide = Math.min(1, t / 200), cy0 = Math.round(H / 2 - 50);
     bx.fillStyle = 'rgba(19,27,27,0.85)'; bx.fillRect(0, cy0, W, 88);
     bx.fillStyle = '#f06733'; bx.fillRect(0, cy0, W, 2); bx.fillRect(0, cy0 + 86, W, 2);
     for (let i = 0; i < 12; i++) { bx.fillStyle = 'rgba(255,173,85,0.3)'; bx.fillRect(((i * 53 + t * 0.6) % (W + 40)) - 40, cy0 + 6 + ((i * 17) % 76), 30, 1); }
-    bx.drawImage(pt, Math.round(-70 + slide * 110), cy0 + 6, pt.width * 2, pt.height * 2);
+    bx.drawImage(pt.big || pt, Math.round(-70 + slide * 110), cy0 + 6, 76, 76);
   }
 }
 function drawBattleUI() {
@@ -1422,8 +1344,7 @@ async function statusPage() {
       rc(0, 0, W, H, 'rgba(8,4,18,0.9)');
       const s = stats(m), L = HEROES[m.id].look;
       box(4, 4, W - 8, H - 8);
-      img(ART.portrait(L), 12, 12, 2);
-      ctx.drawImage(ART.charSprite(L, 'down', Math.floor(T / 200) % 4), 88, 18, 48, 48);
+      { const pt = ART.portrait(L); ctx.drawImage(pt.big || pt, 12, 12, 76, 76); }
       font(14, true); text(hname(m), 140, 26, COL.gold);
       font(9); text(`Level ${m.lv} ${HEROES[m.id].role}`, 140, 40, COL.text); text(`${ELEM_NAME[HEROES[m.id].elem]} element`, 140, 52, ELEM_TEXT[HEROES[m.id].elem]);
       text(`Next level in ${xpNext(m.lv) - m.xp} XP`, 140, 64, COL.dim);
@@ -1599,49 +1520,26 @@ async function endingScene() {
   END.lines.push({ s: 'Thank you for playing Rootwell! (Tap or press A)', t: T, small: true });
   await waitKey();
   await fade(1);
-  game.scene = 'map'; music(cur.def.music); saveGame();
+  titleBuilt = false; W3D.buildMap(cur, state); W3D.resetCamera(); game.scene = 'map'; music(cur.def.music); saveGame();
   await fade(0);
   goalChanged();
   await say('(Game saved. Feel free to keep exploring and hunting for Trinkets!)');
 }
+let titleBuilt = false, lastSceneT = 0;
+function buildTitleWorld() {
+  const def = MAPS.village, t = def.rows.map((r) => r.split(''));
+  const m = { id: 'title', def, w: t[0].length, h: t.length, t, npcs: [], mask: [] };
+  W3D.buildMap(m, { flags: {}, trinkets: {}, mods: {} }); titleBuilt = true;
+}
 function sceneBackdrop(dim) {
-  const k = 'scene' + H;
-  let c = bgCache.get(k);
-  if (!c) {
-    const cols = Math.ceil(W / TS) + 1, rows = Math.ceil(H / TS) + 1;
-    const m = [];
-    for (let y = 0; y < rows; y++) { m.push([]); for (let x = 0; x < cols; x++) m[y].push('.'); }
-    const py = rows - 4;
-    for (let y = py; y < py + 2; y++) for (let x = 1; x < 4; x++) m[y][x] = '~';
-    m[py][2] = '%';
-    for (let y = py - 2; y < rows; y++) m[y][6] = '=';
-    const [cv, g] = ART.mk(cols * TS, rows * TS);
-    const same = (x, y, ch) => (x < 0 || y < 0 || x >= cols || y >= rows ? true : ch === '~' ? '~%'.includes(m[y][x]) : m[y][x] === ch);
-    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-      const ch = m[y][x], base = ch === '%' ? '~' : ch;
-      const D = [[0, -1, 1], [1, 0, 2], [0, 1, 4], [-1, 0, 8], [1, -1, 16], [1, 1, 32], [-1, 1, 64], [-1, -1, 128]];
-      let mask = 0; for (const [dx, dy, b] of D) if (same(x + dx, y + dy, base)) mask |= b;
-      const v = hash(x, y) % 8, fl = ch === '.' && hash(x + 5, y + 2) % 7 === 0;
-      g.drawImage(ART.drawTile(fl ? ',' : ch, { v, mask, ground: '.' }), x * TS, y * TS);
-    }
-    const props = [];
-    for (let y = -1; y < py - 4; y++) for (let x = -1 + (y % 2); x < cols + 1; x += 2) props.push([ART.prop('tree', hash(x, y)), x * TS - 16 + (y % 2) * 12, y * 26 - 16]);
-    props.push([ART.house('cottage'), 5 * TS, (py - 7) * TS]);
-    props.push([ART.prop('bush', 1), 8 * TS, (py) * TS]); props.push([ART.prop('lamp'), 4 * TS, (py - 3) * TS]);
-    props.sort((a, b) => a[2] + a[0].height - (b[2] + b[0].height)).forEach(([im, x, y]) => g.drawImage(im, x, y));
-    c = cv; bgCache.set(k, c);
-  }
-  bx.drawImage(c, 0, 0);
-  for (let i = 0; i < 16; i++) { const x = (i * 61 + Math.sin(T / 1200 + i) * 20 + W) % W, y = H * 0.6 + Math.sin(T / 900 + i * 2) * 50; bx.fillStyle = `rgba(255,250,170,${0.35 + 0.35 * Math.sin(T / 300 + i)})`; bx.fillRect(Math.round(x), Math.round(y), 2, 2); }
-  const g = bx.createLinearGradient(0, 0, 0, H * 0.45); g.addColorStop(0, 'rgba(10,6,20,0.6)'); g.addColorStop(1, 'rgba(10,6,20,0)'); bx.fillStyle = g; bx.fillRect(0, 0, W, H * 0.45);
+  const dt = Math.min(50, T - (lastSceneT || T)); lastSceneT = T;
+  if (!titleBuilt) buildTitleWorld();
+  W3D.hideActors(); W3D.titleSync(dt, {});
+  bx.clearRect(0, 0, W, H);
+  const g = bx.createLinearGradient(0, 0, 0, H * 0.45); g.addColorStop(0, 'rgba(10,6,20,0.45)'); g.addColorStop(1, 'rgba(10,6,20,0)'); bx.fillStyle = g; bx.fillRect(0, 0, W, H * 0.45);
   if (dim) { bx.fillStyle = `rgba(10,6,20,${dim})`; bx.fillRect(0, 0, W, H); }
 }
-function renderTitle() {
-  sceneBackdrop(0);
-  const rows = Math.ceil(H / TS) + 1, gy = (rows - 3) * TS - 30;
-  bx.drawImage(ART.charSprite(HEROES.bram.look, 'right', 0), 140, gy);
-  bx.drawImage(ART.charSprite(HEROES.wren.look, 'right', 0), 168, gy - 4);
-}
+function renderTitle() { sceneBackdrop(0); }
 function drawTitleUI() {
   const ty = Math.round(H * 0.22);
   font(30, true); ctx.textAlign = 'center';
@@ -1675,7 +1573,7 @@ async function titleScreen() {
     }
     await fade(1);
     if (choice === 'Continue' && loadGame()) {
-      loadMap(state.map); placePlayer(state.x, state.y, state.dir);
+      titleBuilt = false; loadMap(state.map); placePlayer(state.x, state.y, state.dir);
       game.scene = 'map';
       await fade(0);
       return;
@@ -1686,7 +1584,7 @@ async function titleScreen() {
     await say('Mossbell Vale has always bloomed. Beneath the old hill, the Rootwell spring hums a quiet song, and wherever its water flows, flowers follow.');
     await say('But three days ago, the humming stopped. And the petals began to turn gray...');
     await fade(1);
-    loadMap('village'); placePlayer(11, 13, 'down');
+    titleBuilt = false; loadMap('village'); placePlayer(12, 13, 'down');
     game.scene = 'map';
     await fade(0);
     await cur.def.onEnter();
@@ -1728,11 +1626,13 @@ function render(dt) {
   if (game.scene === 'title') renderTitle();
   else if (game.scene === 'map' && cur) renderMap();
   else if (game.scene === 'battle' && B) renderBattle(dt);
-  else if (game.scene === 'ending' || game.scene === 'intro') sceneBackdrop(game.scene === 'intro' ? 0.3 : 0.6);
+  else if (game.scene === 'ending' || game.scene === 'intro') sceneBackdrop(game.scene === 'intro' ? 0.35 : 0.6);
   else { bx.fillStyle = '#131b1b'; bx.fillRect(0, 0, W, H); }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  if (game.scene === 'map' && cur) ctx.drawImage(wbuf, 0, 0, W * S, H * S); else ctx.drawImage(buf, 0, 0, W * S, H * S);
+  const three = window.W3D && W3D.ready && ['map', 'battle', 'title', 'intro', 'ending'].includes(game.scene) && (game.scene !== 'map' || cur) && (game.scene !== 'battle' || B);
+  if (three) { W3D.render(game.scene === 'battle' ? 'battle' : 'map'); ctx.clearRect(0, 0, cvs.width, cvs.height); }
+  ctx.drawImage(buf, 0, 0, W * S, H * S);
   ctx.setTransform(S, 0, 0, S, 0, 0);
   ctx.textBaseline = 'alphabetic';
   if (game.scene === 'title') drawTitleUI();
@@ -1752,7 +1652,13 @@ let loadP = 0, loadErr = null;
 (async () => {
   game.scene = 'loading';
   preloadMusic();
-  try { await Promise.all([ART.load((p) => (loadP = p)), Promise.race([document.fonts.load('10px Pixelify'), sleep(1500)])]); }
+  try {
+    await window.W3DReady;
+    W3D.init(document.getElementById('gl'));
+    let p2 = 0, p3 = 0;
+    await Promise.all([ART.load((p) => (p2 = p, loadP = p2 * 0.15 + p3 * 0.85)), W3D.load((p) => (p3 = p, loadP = p2 * 0.15 + p3 * 0.85)), Promise.race([document.fonts.load('10px Pixelify'), sleep(1500)])]);
+    W3D.ready = true;
+  }
   catch (e) { loadErr = e.message; return; }
   resize();
   runScript(titleScreen);
