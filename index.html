@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#120c24">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dawnbeacon">
+<meta name="description" content="Dawnbeacon: a pocket elemental RPG. Explore, solve puzzles with elemental powers, collect Wisps and battle the Gloom.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Dawnbeacon</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0a1a; overflow: hidden; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    font-family: "Trebuchet MS", Verdana, sans-serif; color: #dfe6ff; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #screen { position: relative; flex: 0 0 auto; width: 100%; height: min(66.67vw, 62vh); display: flex; align-items: center; justify-content: center; }
+  #game { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; box-shadow: 0 0 0 2px #2a2050, 0 6px 24px #000; }
+  #controls { position: relative; flex: 1; min-height: 190px; }
+  #dpad { position: absolute; left: 6%; top: 50%; transform: translateY(-50%); width: 150px; height: 150px; touch-action: none; }
+  #dpad .arm { position: absolute; background: #2c2650; border: 2px solid #4a4280; box-shadow: inset 0 -3px 0 #1c1838; }
+  #dpad .h { left: 0; right: 0; top: 50px; height: 46px; border-radius: 10px; }
+  #dpad .v { top: 0; bottom: 0; left: 50px; width: 46px; border-radius: 10px; }
+  #dpad .hub { position: absolute; left: 52px; top: 52px; width: 46px; height: 46px; background: #2c2650; }
+  #dpad .tri { position: absolute; width: 0; height: 0; border: 9px solid transparent; opacity: .75; }
+  #dpad .tu { left: 66px; top: 8px; border-bottom: 12px solid #cfd6ff; border-top: 0; }
+  #dpad .td { left: 66px; bottom: 8px; border-top: 12px solid #cfd6ff; border-bottom: 0; }
+  #dpad .tl { top: 66px; left: 8px; border-right: 12px solid #cfd6ff; border-left: 0; }
+  #dpad .tr { top: 66px; right: 8px; border-left: 12px solid #cfd6ff; border-right: 0; }
+  #dpad[data-dir="up"] .tu, #dpad[data-dir="down"] .td, #dpad[data-dir="left"] .tl, #dpad[data-dir="right"] .tr { opacity: 1; filter: drop-shadow(0 0 4px #ffe08a); }
+  #btns { position: absolute; right: 5%; top: 50%; transform: translateY(-50%); width: 170px; height: 170px; }
+  .btn { position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; touch-action: none;
+    color: #fff; box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), 0 3px 8px rgba(0,0,0,.5); font-size: 22px; }
+  .btn.on { transform: scale(.92); filter: brightness(1.3); }
+  .btn small { position: absolute; bottom: -17px; font-size: 10px; font-weight: normal; color: #9aa4d8; white-space: nowrap; }
+  .btn[data-k="a"] { width: 66px; height: 66px; right: 0; top: 34px; background: radial-gradient(circle at 35% 30%, #ff8a6a, #c8382a); }
+  .btn[data-k="b"] { width: 58px; height: 58px; right: 78px; top: 82px; background: radial-gradient(circle at 35% 30%, #f8d070, #b8862a); }
+  .btn[data-k="p"] { width: 44px; height: 44px; right: 84px; top: 4px; font-size: 20px; background: radial-gradient(circle at 35% 30%, #a8a0ff, #5a48c8); }
+  .btn[data-k="m"] { width: 40px; height: 40px; right: 14px; top: 124px; font-size: 18px; background: radial-gradient(circle at 35% 30%, #8090b0, #3a4660); }
+  @media (orientation: landscape) and (max-height: 600px) {
+    #screen { position: absolute; top: 0; bottom: 0; left: 150px; right: 150px; width: auto; height: auto; }
+    #controls { position: absolute; inset: 0; pointer-events: none; }
+    #dpad, #btns { pointer-events: auto; }
+    #dpad { left: 8px; top: auto; bottom: 18px; transform: scale(.88); transform-origin: left bottom; }
+    #btns { right: 4px; top: auto; bottom: 22px; transform: scale(.8); transform-origin: right bottom; }
+  }
+  @media (min-width: 900px) and (min-height: 700px) {
+    #screen { height: min(66.67vw, 72vh); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="screen"><canvas id="game" width="864" height="576"></canvas></div>
+  <div id="controls">
+    <div id="dpad">
+      <div class="arm h"></div><div class="arm v"></div><div class="hub"></div>
+      <div class="tri tu"></div><div class="tri td"></div><div class="tri tl"></div><div class="tri tr"></div>
+    </div>
+    <div id="btns">
+      <div class="btn" data-k="p">✦<small>Power</small></div>
+      <div class="btn" data-k="a">A<small>Action</small></div>
+      <div class="btn" data-k="b">B<small>Back / Run</small></div>
+      <div class="btn" data-k="m">☰<small>Menu</small></div>
+    </div>
+  </div>
+</div>
+<script src="data.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
