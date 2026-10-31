@@ -8,19 +8,19 @@ const ELEM_NAME = { gale: 'Gale', ember: 'Ember', bloom: 'Bloom', hush: 'Hush' }
 const HEROES = {
   wren: {
     name: 'Wren', elem: 'gale', field: 'gust', role: 'Cartographer',
-    look: { skin: '#f2c8a0', hair: '#4a2e22', hairStyle: 'bob', top: '#e8dcc0', bottom: '#5a4a6a', cape: '#2f8f86', feather: '#e8604a', belt: '#7a4a2a', sash: '#7a4a2a' },
+    look: { sheet: 'Woman' },
     base: { hp: 32, fp: 14, atk: 10, def: 6, agi: 10 }, grow: { hp: 6, fp: 3, atk: 2.2, def: 1.4, agi: 1.6 },
     skills: [['gustedge', 1], ['tailwind', 2], ['cyclone', 3], ['galelance', 5], ['tempest', 7]], burst: 'skyrend',
   },
   bram: {
     name: 'Bram', elem: 'ember', field: 'kindle', role: 'Blacksmith',
-    look: { skin: '#e8b48a', hair: '#c0582a', hairStyle: 'messy', top: '#b84a3a', bottom: '#4a3a32', apron: '#7a5232', beard: '#b0502a', build: 'broad', lantern: true },
+    look: { sheet: 'Hunter' },
     base: { hp: 40, fp: 10, atk: 12, def: 8, agi: 6 }, grow: { hp: 7.5, fp: 2.2, atk: 2.6, def: 1.8, agi: 1 },
     skills: [['cinder', 1], ['firstaid', 1], ['ironhide', 2], ['flamewall', 3], ['forgeburst', 5]], burst: 'starforge',
   },
   tamsin: {
     name: 'Tamsin', elem: 'bloom', field: 'bloom', role: 'Botanist',
-    look: { skin: '#f6d2b0', hair: '#3a6a3a', hairStyle: 'braid', top: '#f0e8d0', dress: '#5a9a5a', glasses: true, crown: true, accent: '#ff80b0' },
+    look: { sheet: 'Cavegirl' },
     base: { hp: 28, fp: 18, atk: 8, def: 5, agi: 9 }, grow: { hp: 5.2, fp: 3.6, atk: 1.8, def: 1.2, agi: 1.4 },
     skills: [['mendpetal', 1], ['thornsnare', 1], ['blossomrain', 3], ['reviveseed', 4], ['briarstorm', 6]], burst: 'verdant',
   },
@@ -72,23 +72,25 @@ const ITEMS = {
 const SHOP_LIST = ['herb', 'tea', 'salts', 'tinblade', 'quilted', 'steelblade', 'chain', 'starsteel', 'moonweave'];
 
 const ENEMIES = {
-  puddle: { name: 'Puddlejelly', shape: 'jelly', hp: 20, atk: 8, def: 3, agi: 5, xp: 8, gold: 4, weak: 'bloom', resist: 'ember' },
-  burrbun: { name: 'Burrbun', shape: 'bun', hp: 24, atk: 10, def: 4, agi: 9, xp: 10, gold: 6, weak: 'ember' },
-  wasp: { name: 'Thistle Wasp', shape: 'wasp', hp: 18, atk: 11, def: 2, agi: 14, xp: 10, gold: 6, weak: 'gale', float: true },
-  mudsnout: { name: 'Mudsnout', shape: 'mole', hp: 36, atk: 13, def: 8, agi: 4, xp: 16, gold: 10, weak: 'bloom', resist: 'gale',
+  puddle: { name: 'Puddlejelly', shape: 'Slime3', hp: 20, atk: 8, def: 3, agi: 5, xp: 8, gold: 4, weak: 'bloom', resist: 'ember' },
+  burrbun: { name: 'Rascal Raccoon', shape: 'Racoon', hp: 24, atk: 10, def: 4, agi: 9, xp: 10, gold: 6, weak: 'ember' },
+  wasp: { name: 'Thistlewing', shape: 'Butterfly', hp: 18, atk: 11, def: 2, agi: 14, xp: 10, gold: 6, weak: 'gale', float: true },
+  mudsnout: { name: 'Mudsnout', shape: 'Mole', hp: 36, atk: 13, def: 8, agi: 4, xp: 16, gold: 10, weak: 'bloom', resist: 'gale',
     arts: [{ name: 'Mud Toss', elem: 'bloom', power: 12, target: 'one', chance: 0.3 }] },
-  glowcap: { name: 'Glowcap', shape: 'glowcap', hp: 44, atk: 15, def: 8, agi: 8, xp: 24, gold: 16, weak: 'ember', resist: 'bloom',
+  glowcap: { name: 'Glowcap', shape: 'Mushroom2', hp: 44, atk: 15, def: 8, agi: 8, xp: 24, gold: 16, weak: 'ember', resist: 'bloom',
     arts: [{ name: 'Spore Puff', elem: 'bloom', power: 13, target: 'all', chance: 0.35 }] },
-  shellback: { name: 'Shellback', shape: 'shell', hp: 78, atk: 20, def: 15, agi: 3, xp: 34, gold: 22, weak: 'bloom', resist: 'gale',
+  shellback: { name: 'Shellback', shape: 'Mollusc2', hp: 78, atk: 20, def: 15, agi: 3, xp: 34, gold: 22, weak: 'bloom', resist: 'gale',
     arts: [{ name: 'Shell Slam', elem: 'hush', power: 26, target: 'one', chance: 0.25 }] },
-  hushmoth: { name: 'Hushmoth', shape: 'moth', hp: 34, atk: 16, def: 6, agi: 15, xp: 20, gold: 12, weak: 'gale', float: true,
+  hushmoth: { name: 'Hushmoth', shape: 'ButterflyBlue', hp: 34, atk: 16, def: 6, agi: 15, xp: 20, gold: 12, weak: 'gale', float: true,
     arts: [{ name: 'Silent Dust', elem: 'hush', power: 10, target: 'all', chance: 0.25 }] },
-  queen: { name: 'Hushmoth Queen', shape: 'queen', hp: 520, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
-    arts: [{ name: 'Wingstorm', elem: 'hush', power: 20, target: 'all', chance: 0.3 }, { name: 'Hush Drain', elem: 'hush', power: 32, target: 'one', chance: 0.3, drain: true }] },
+  hushling: { name: 'Hushling', shape: 'Spirit', hp: 38, atk: 17, def: 7, agi: 12, xp: 24, gold: 14, weak: 'ember', resist: 'bloom', float: true,
+    arts: [{ name: 'Chill Whisper', elem: 'hush', power: 14, target: 'one', chance: 0.3 }] },
+  queen: { name: 'Hush Wraith', shape: 'GiantSpirit', hp: 520, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
+    arts: [{ name: 'Mournful Wail', elem: 'hush', power: 20, target: 'all', chance: 0.3 }, { name: 'Hush Drain', elem: 'hush', power: 32, target: 'one', chance: 0.3, drain: true }] },
 };
 const ENCOUNTERS = {
   field: [['puddle'], ['puddle', 'puddle'], ['burrbun'], ['wasp'], ['wasp', 'puddle'], ['burrbun', 'puddle'], ['mudsnout'], ['burrbun', 'burrbun'], ['wasp', 'wasp']],
-  grotto: [['hushmoth', 'hushmoth'], ['shellback'], ['glowcap'], ['glowcap', 'hushmoth'], ['mudsnout', 'hushmoth'], ['shellback', 'glowcap'], ['hushmoth', 'hushmoth', 'hushmoth'], ['glowcap', 'glowcap']],
+  grotto: [['hushmoth', 'hushmoth'], ['shellback'], ['glowcap'], ['glowcap', 'hushmoth'], ['mudsnout', 'hushmoth'], ['shellback', 'glowcap'], ['hushmoth', 'hushmoth', 'hushmoth'], ['glowcap', 'glowcap'], ['hushling', 'hushmoth'], ['hushling']],
 };
 
 // ---------- people (dialog speakers & NPC looks) ----------
@@ -96,14 +98,14 @@ const PEOPLE = {
   wren: { name: 'Wren', look: HEROES.wren.look },
   bram: { name: 'Bram', look: HEROES.bram.look },
   tamsin: { name: 'Tamsin', look: HEROES.tamsin.look },
-  gran: { name: 'Gran Hesper', look: { skin: '#ecc4a0', hair: '#e8e4ec', hairStyle: 'bun', top: '#7a5aa0', bottom: '#5a4a6a', apron: '#f0e8d8' } },
-  pell: { name: 'Pell', look: { skin: '#d8a47a', hair: '#6a4a2a', hairStyle: 'short', top: '#6a8a4a', bottom: '#4a3a2a', hat: '#c8a050', beard: '#6a4a2a' } },
-  rosa: { name: 'Rosa', look: { skin: '#f0c8a0', hair: '#b05a30', hairStyle: 'long', top: '#d06080', dress: '#c05070' } },
-  pip: { name: 'Pip', look: { skin: '#f4cca4', hair: '#e0a030', hairStyle: 'messy', top: '#4a7ad0', bottom: '#3a4a6a', build: 'small' } },
-  ivy: { name: 'Ivy', look: { skin: '#c89070', hair: '#2a2030', hairStyle: 'long', top: '#3a6a8a', dress: '#2a4a6a', glasses: true } },
-  marta: { name: 'Marta', look: { skin: '#e8b890', hair: '#7a3a2a', hairStyle: 'bun', top: '#c08040', bottom: '#5a3a20', apron: '#f4ecdc' } },
-  dorrit: { name: 'Dorrit', look: { skin: '#f0c49a', hair: '#5a5a6a', hairStyle: 'bald', top: '#3a6aa0', bottom: '#2a2a3a', beard: '#8a8a9a' } },
-  odo: { name: 'Odo', look: { skin: '#d8a070', hair: '#402818', hairStyle: 'short', top: '#806040', bottom: '#4a3a2a', hat: '#6a4a8a', cape: '#5a4a3a' } },
+  gran: { name: 'Gran Hesper', look: { sheet: 'OldWoman' } },
+  pell: { name: 'Pell', look: { sheet: 'OldMan2' } },
+  rosa: { name: 'Rosa', look: { sheet: 'Princess' } },
+  pip: { name: 'Pip', look: { sheet: 'Boy' } },
+  ivy: { name: 'Ivy', look: { sheet: 'SorcererOrange' } },
+  marta: { name: 'Marta', look: { sheet: 'Villager4' } },
+  dorrit: { name: 'Dorrit', look: { sheet: 'OldMan' } },
+  odo: { name: 'Odo', look: { sheet: 'Inspector' } },
 };
 
 // ---------- maps ----------
@@ -117,22 +119,22 @@ const MAPS = {
     name: 'Mossbell Village', ground: '.', music: 'village', ambient: 'leaves', outdoor: true,
     rows: [
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
-      'TTT.........TT..T.........TTTT',
-      'TT.RRRRR.FFF.......RRRRRR...TT',
-      'T..RRRRR.F,F....,..RRRRRR...TT',
-      'T.bHHDHHbFFF......bHHDHHHb..TT',
-      'T....=...............=.l....TT',
-      'T....=================.....,TT',
-      'T..,..l.......=...........t.TT',
+      'TTT.....T...TT..T.........TTTT',
+      'TT.RRRR..FFF.......RRRR.....TT',
+      'T..RRRR..F,F....,..RRRR.....TT',
+      'T.bHDDHb.FFF......bHDDHb....TT',
+      'T...==..............==.l....TT',
+      'T...==================.....,TT',
+      'T..,...l......=...........t.TT',
       'T.......~~~~.l=.w..,........TT',
-      'TT..,...~~~~~.=..........lS.TT',
+      'TT..,...~~~~..=..........lS.TT',
       'TT......~~~~..================',
       'T.............=.............TT',
-      'T..RRRRR.,..t.=l.,........,.TT',
-      'T..RRRRR......=.....RRRRR...TT',
-      'T.bHHDHHu.....=.....RRRRRx..TT',
-      'T....=..xu....=....xHHHHHu..TT',
-      'T.,..==========.............TT',
+      'T..RRR...,..t.=l.,........,.TT',
+      'T..RRR........=....RRR.RRR..TT',
+      'T.bHDHbu......=....RRR.RRR..TT',
+      'T...=..xu.....=...xHHHuHHHx.TT',
+      'T.,.===========.............TT',
       'T..,........................TT',
       'T.....,.....,.....,.....,...TT',
       'TT..t..............t.......TTT',
@@ -140,11 +142,14 @@ const MAPS = {
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     ],
     warps: [
+      { x: 4, y: 4, to: 'gran', tx: 4, ty: 6, dir: 'up' },
       { x: 5, y: 4, to: 'gran', tx: 4, ty: 6, dir: 'up' },
+      { x: 20, y: 4, to: 'inn', tx: 4, ty: 6, dir: 'up' },
       { x: 21, y: 4, to: 'inn', tx: 4, ty: 6, dir: 'up' },
-      { x: 5, y: 14, to: 'shop', tx: 4, ty: 6, dir: 'up' },
+      { x: 4, y: 14, to: 'shop', tx: 4, ty: 6, dir: 'up' },
       { x: 29, y: 10, to: 'field', tx: 1, ty: 11, dir: 'right' },
     ],
+    houses: [{ x: 3, y: 2, kind: 'cottage' }, { x: 19, y: 2, kind: 'inn' }, { x: 3, y: 12, kind: 'shop' }, { x: 19, y: 13, kind: 'forge' }, { x: 23, y: 13, kind: 'hut' }],
     signs: { '26,9': 'East: Windmere Fields.\nBeyond them, in the cliffs: Whisper Grotto.' },
     trinkets: [{ id: 'foxbell', x: 27, y: 18 }],
     npcs: [
@@ -184,20 +189,20 @@ const MAPS = {
 
   gran: {
     name: "Gran's Cottage", ground: 'W', music: 'village', interior: true,
-    rows: ['QQQQQQQQQQ', 'QQQQQQQQQQ', 'QYYWWWWWeQ', 'QWWWggWWWQ', 'QqWkggWWWQ', 'QWWWggWWqQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
-    warps: [{ x: 4, y: 7, to: 'village', tx: 5, ty: 5, dir: 'down' }],
+    rows: ['QQQQQQQQQQ', 'QYYWWWWWYQ', 'QWWWggWWWQ', 'QqWkggWWWQ', 'QWWWggWWqQ', 'QWWWWWWWWQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
+    warps: [{ x: 4, y: 7, to: 'village', tx: 4, ty: 5, dir: 'down' }],
     npcs: [{ id: 'gran', x: 6, y: 3, who: 'gran', dir: 'down', talk: async () => granScript() }],
   },
   inn: {
     name: 'The Sleepy Kettle', ground: 'W', music: 'village', interior: true,
-    rows: ['QQQQQQQQQQ', 'QQQQQQQQQQ', 'QeWWWWWWeQ', 'QWWKKKKWWQ', 'QWWWggWWWQ', 'QqWWggWWqQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
-    warps: [{ x: 4, y: 7, to: 'village', tx: 21, ty: 5, dir: 'down' }],
+    rows: ['QQQQQQQQQQ', 'QYWWWWWWYQ', 'QWWWWWWWWQ', 'QWWKKKKWWQ', 'QWWWggWWWQ', 'QqWWggWWqQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
+    warps: [{ x: 4, y: 7, to: 'village', tx: 20, ty: 5, dir: 'down' }],
     npcs: [{ id: 'marta', x: 4, y: 2, who: 'marta', dir: 'down', talk: async () => innScript() }],
   },
   shop: {
     name: 'Tinker & Thyme', ground: 'W', music: 'village', interior: true,
-    rows: ['QQQQQQQQQQ', 'QQQQQQQQQQ', 'QYYWWWWYYQ', 'QWWKKKKWWQ', 'QWWWggWWWQ', 'QuWWggWWxQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
-    warps: [{ x: 4, y: 7, to: 'village', tx: 5, ty: 15, dir: 'down' }],
+    rows: ['QQQQQQQQQQ', 'QYYWWWWYYQ', 'QWWWWWWWWQ', 'QWWKKKKWWQ', 'QWWWggWWWQ', 'QuWWggWWxQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
+    warps: [{ x: 4, y: 7, to: 'village', tx: 4, ty: 15, dir: 'down' }],
     npcs: [{ id: 'dorrit', x: 4, y: 2, who: 'dorrit', dir: 'down',
       talk: async () => { await say("Welcome to Tinker & Thyme! Herbs, teas, blades and armor. Have a look!", 'dorrit'); await shopScript(); } }],
   },
@@ -338,7 +343,7 @@ async function granScript() {
 async function tamsinScript() {
   await say("Hello? Is someone there? Oh, thank goodness, light! And people!", 'tamsin', '???');
   await say("I'm Tamsin, a botanist from Larkspur College. I came to take samples from the Rootwell, but a rockslide boxed me in.", 'tamsin');
-  await say("Strange gray moths have been swarming toward the spring for days. I think they're what silenced it.", 'tamsin');
+  await say("Strange gray moths have been swarming toward the spring for days, and the air down here has gone so cold. Something is feeding on the spring's song.", 'tamsin');
   await say("We're heading there now. Come with us?", 'wren');
   await say("Gladly! And I can help: my lilypad seeds grow pads big enough to walk on. That underground river won't stop us!", 'tamsin');
   const lv = Math.max(...state.party.map((m) => m.lv));
@@ -352,15 +357,15 @@ async function bossScript() {
   if (state.flags.bossDead) return;
   P.path = []; P.dir = 'up';
   await sleep(250);
-  await say('A low hum fills the chamber. Something enormous unfolds its wings over the spring...');
-  await say("A Hushmoth! But she's huge... She's drinking the spring's song!", 'tamsin');
+  await say('A cold mist gathers over the spring, and slowly takes shape...');
+  await say("A Hush Wraith! That's what the moths were drawn to. It's drinking the spring's song!", 'tamsin');
   await say("Then let's give her something louder.", 'bram');
   const r = await fight(['queen'], { boss: true, bg: 'boss' });
   if (r === 'lose') return;
   state.flags.bossDead = true;
   syncNpcs(); goalChanged();
-  await say('The Hushmoth Queen crumbles into silver-gray dust.');
-  await say("Look, there's a silver band on what's left of her leg. Someone tagged her...", 'tamsin');
+  await say('The Hush Wraith unravels into thin gray mist.');
+  await say("Look, a silver band, lying right where it vanished. Someone bound that creature here...", 'tamsin');
   await say("We can worry about that later. The spring!", 'wren');
 }
 function goalText() {

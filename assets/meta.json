@@ -1,0 +1,42 @@
+{
+ "ember": {
+  "frames": 8,
+  "w": 25,
+  "h": 30
+ },
+ "bloom": {
+  "frames": 8,
+  "w": 30,
+  "h": 28
+ },
+ "gale": {
+  "frames": 8,
+  "w": 20,
+  "h": 28
+ },
+ "hush": {
+  "frames": 5,
+  "w": 32,
+  "h": 32
+ },
+ "smoke": {
+  "frames": 8,
+  "w": 30,
+  "h": 14
+ },
+ "heal": {
+  "frames": 4,
+  "w": 32,
+  "h": 32
+ },
+ "slash": {
+  "frames": 5,
+  "w": 26,
+  "h": 32
+ },
+ "boss": {
+  "frames": 5,
+  "w": 50,
+  "h": 50
+ }
+}

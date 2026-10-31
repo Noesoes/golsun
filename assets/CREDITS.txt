@@ -1,0 +1,6 @@
+Art, music and jingles in this folder come from the "Ninja Adventure" asset pack
+by Pixel-Boy and AAA: https://pixel-boy.itch.io/ninja-adventure-asset-pack
+Released under Creative Commons Zero (CC0). Thank you!
+
+Only the pieces Rootwell uses are included; music was converted from OGG to MP3.
+Rebuild with: python3 tools/build_assets.py "/path/to/Ninja Adventure - Asset Pack"

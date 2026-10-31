@@ -18,13 +18,12 @@ Together they travel through Windmere Fields and into Whisper Grotto to find out
 
 ## Features
 
-- **Hand-crafted pixel art.** Every sprite, tile and portrait is drawn in code: outlined characters with walk cycles, auto-tiled terrain, overlapping tree canopies, lighting and darkness in caves, chimney smoke, drifting petals and more.
+- **Hand-drawn pixel art and music** from the free Ninja Adventure pack: animated characters with portraits, monsters, a boss, auto-tiled terrain, houses, cave lighting and effects, plus a real soundtrack.
 - **Tool puzzles.** Wren's *Gust* blows boulders across the floor, even into pits. Bram's *Kindle* burns away brambles. Tamsin's *Lilypad* seeds grow pads you can walk across water on.
 - **Side-view turn-based battles.** Use skills, items and Guard, and exploit Gale, Ember and Bloom weaknesses. Your party shares a **Harmony** gauge; when it's full, unleash a hero's **Burst** move.
 - **Trinkets.** Four hidden charms with passive bonuses. Each hero can wear one.
 - **Phone-friendly controls.** Tap anywhere to walk there, and tap people or objects to interact. You can also use the D-pad and buttons. Prompts show what you can interact with, and the A button's label changes to match (Talk, Open, Use...).
 - **Quality of life.** A goal tracker, autosave whenever you change areas, "Try again" after losing a battle, an Auto-battle command, and settings for music, sound and text speed.
-- **Music and sound effects** generated live in the browser.
 
 ## Controls
 
@@ -56,10 +55,17 @@ python3 -m http.server 8000
 ## Files
 
 - `index.html`: page layout and touch controls
-- `art.js`: procedural pixel art (tiles, props, characters, portraits, enemies, icons)
+- `art.js`: loads the sprite sheets and slices them into tiles, props, characters, portraits, enemies and effects
+- `assets/`: the art and music used by the game (see credits below)
+- `tools/build_assets.py`: copies the needed pieces out of the asset pack and converts the music
 - `game.js`: engine (rendering, input, maps, battles, menus, audio)
 - `data.js`: heroes, skills, Trinkets, items, enemies, maps and the story
 - `sw.js`, `manifest.webmanifest`, `icon-*.png`: installable, offline-capable app (PWA)
 - `fonts/`: [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans), licensed under the SIL Open Font License (see `fonts/OFL.txt`)
 
-Rootwell is an original game. Its world, characters, story and mechanics were created for this project.
+## Credits
+
+- Art, music and jingles: [Ninja Adventure asset pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack) by Pixel-Boy and AAA, released under CC0.
+- Font: Pixelify Sans, licensed under the SIL Open Font License.
+
+Rootwell's world, characters, story and mechanics are original to this project.
