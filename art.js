@@ -171,7 +171,7 @@ const ART = (() => {
   function enemySprite(shape, frame, fl) {
     let c;
     if (shape === 'GiantSpirit') { const m = META.boss; c = crop('monsters/GiantSpirit', (frame % m.frames) * m.w, 0, m.w, m.h); }
-    else c = crop('monsters/' + shape, 3 * 16, (frame % 4) * 16, 16, 16);
+    else c = crop('monsters/' + shape, 0, (frame % 4) * 16, 16, 16);
     return fl ? flash(c) : c;
   }
   const enemySize = (shape) => (shape === 'GiantSpirit' ? { w: 100, h: 92 } : { w: 32, h: 30 });
