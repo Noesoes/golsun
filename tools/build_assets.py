@@ -21,7 +21,9 @@ def mp3(src, dst, br='64k', mono=False):
     if mono: cmd += ['-ac', '1']
     subprocess.run(cmd + [d], check=True)
 
-if os.path.isdir(DST): shutil.rmtree(DST)
+for sub in ['tiles', 'chars', 'faces', 'icons', 'misc', 'fx', 'ui', 'music']:
+    if os.path.isdir(os.path.join(DST, sub)): shutil.rmtree(os.path.join(DST, sub))
+# battle monsters come from tools/build_monsters.py
 tiles = {'floor': T + 'TilesetFloor.png', 'nature': T + 'TilesetNature.png', 'water': T + 'TilesetWater.png',
          'house': T + 'TilesetHouse.png', 'element': T + 'TilesetElement.png', 'detail': T + 'TilesetFloorDetail.png',
          'hole': T + 'TilesetHole.png', 'relief': T + 'TilesetRelief.png', 'ifloor': T + 'Interior/TilesetInteriorFloor.png',
@@ -32,13 +34,6 @@ chars = ['Woman', 'Hunter', 'Cavegirl', 'OldWoman', 'OldMan2', 'Princess', 'Boy'
 for c in chars:
     cp(f'Actor/Character/{c}/SpriteSheet.png', f'chars/{c}.png')
     cp(f'Actor/Character/{c}/Faceset.png', f'faces/{c}.png')
-
-monsters = ['Slime3', 'Racoon', 'Butterfly', 'Mole', 'Mushroom2', 'Mollusc2', 'ButterflyBlue', 'Spirit']
-for m in monsters:
-    d = f'Actor/Monster/{m}/'
-    sheet = [f for f in os.listdir(os.path.join(SRC, d)) if f.endswith('.png') and 'Faceset' not in f][0]
-    cp(d + sheet, f'monsters/{m}.png')
-cp('Actor/Boss/GiantSpirit/Idle.png', 'monsters/GiantSpirit.png')
 
 icons = {'herb': 'Items/Resource/Grass.png', 'tonic': 'Items/Food/TeaLeaf.png', 'plume': 'Items/Potion/LifePot.png',
          'berry': 'Items/Potion/Heart.png', 'weapon': 'Items/Weapons/Sword/Sprite.png', 'armor': 'Items/Resource/BarIron.png',
@@ -75,7 +70,6 @@ for k in fx:
 FRAMES = {'ember': 8, 'bloom': 8, 'gale': 8, 'smoke': 8}  # sheets whose frames touch each other
 for k, n in FRAMES.items():
     im = Image.open(os.path.join(DST, f'fx/{k}.png')); meta[k] = {'frames': n, 'w': im.width // n, 'h': im.height}
-im = Image.open(os.path.join(DST, 'monsters/GiantSpirit.png')); meta['boss'] = {'frames': im.width // im.height, 'w': im.height, 'h': im.height}
 json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'), indent=1)
 print(json.dumps(meta))
 total = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(DST) for f in fs)

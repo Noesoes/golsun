@@ -1,6 +1,7 @@
 'use strict';
 // ===================== Rootwell — art =====================
-// Pixel art from the "Ninja Adventure" asset pack by Pixel-Boy & AAA (CC0).
+// Pixel art from the "Ninja Adventure" asset pack by Pixel-Boy & AAA (CC0); battle monsters from
+// the Pipoya Free RPG Monster Pack and Creature Collector 64x64 by dadddydarko.
 // This module loads the sprite sheets and slices them into cached 1:1 canvases.
 const ART = (() => {
   const IMG = {};
@@ -14,7 +15,7 @@ const ART = (() => {
   const FILES = {
     tiles: ['floor', 'nature', 'water', 'house', 'element', 'detail', 'hole', 'relief', 'ifloor', 'wall'],
     chars: ['Woman', 'Hunter', 'Cavegirl', 'OldWoman', 'OldMan2', 'Princess', 'Boy', 'SorcererOrange', 'Villager4', 'OldMan', 'Inspector'],
-    monsters: ['Slime3', 'Racoon', 'Butterfly', 'Mole', 'Mushroom2', 'Mollusc2', 'ButterflyBlue', 'Spirit', 'GiantSpirit'],
+    monsters: ['slime', 'squirrel', 'wasp', 'worm', 'mushroom', 'turtle', 'moth', 'ghost', 'wraith'],
     icons: ['herb', 'tonic', 'plume', 'berry', 'weapon', 'armor', 'trinket', 'gold'],
     fx: ['ember', 'bloom', 'gale', 'hush', 'smoke', 'heal', 'slash', 'leaf', 'leafpink'],
     ui: ['panel', 'panel_dark', 'faceframe', 'arrow'],
@@ -168,13 +169,13 @@ const ART = (() => {
   const DIRCOL = { down: 0, up: 1, left: 2, right: 3 };
   function charSprite(look, dir, frame) { return crop('chars/' + look.sheet, DIRCOL[dir] * 16, (frame | 0) * 16, 16, 16); }
   function portrait(look) { return IMG['faces/' + look.sheet]; }
+  // battle monsters (Pipoya + Creature Collector, see tools/build_monsters.py): single static frames
   function enemySprite(shape, frame, fl) {
-    let c;
-    if (shape === 'GiantSpirit') { const m = META.boss; c = crop('monsters/GiantSpirit', (frame % m.frames) * m.w, 0, m.w, m.h); }
-    else c = crop('monsters/' + shape, 0, (frame % 4) * 16, 16, 16);
+    const im = IMG['monsters/' + shape];
+    const c = crop('monsters/' + shape, 0, 0, im.width, im.height);
     return fl ? flash(c) : c;
   }
-  const enemySize = (shape) => (shape === 'GiantSpirit' ? { w: 100, h: 92 } : { w: 32, h: 30 });
+  const enemySize = (shape) => { const im = IMG['monsters/' + shape]; return { w: im.width, h: im.height }; };
   function icon(kind) { return IMG['icons/' + kind]; }
   function fx(name, i) { const m = META[name]; return crop('fx/' + name, (i % m.frames) * m.w, 0, m.w, m.h); }
   const fxFrames = (name) => (META[name] ? META[name].frames : 1);

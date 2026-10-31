@@ -777,8 +777,8 @@ function renderMap() {
     const nx = (n.fx + (n.x - n.fx) * n.t) * TS, ny = (n.fy + (n.y - n.fy) * n.t) * TS;
     sprites.push({ y: ny + 15, draw: () => {
       if (n.enemy) {
-        const im = ART.enemySprite(ENEMIES[n.enemy].shape, Math.floor(T / 140), false);
-        bx.globalAlpha = 0.92; bx.drawImage(im, Math.round(nx - cx + 8 - im.width / 2), Math.round(ny - cy + 16 - im.height + Math.sin(T / 400) * 3)); bx.globalAlpha = 1;
+        const im = ART.enemySprite(ENEMIES[n.enemy].shape, 0, false), w = Math.round(im.width * 0.6), h = Math.round(im.height * 0.6);
+        bx.globalAlpha = 0.92; bx.drawImage(im, Math.round(nx - cx + 8 - w / 2), Math.round(ny - cy + 16 - h + Math.sin(T / 400) * 3), w, h); bx.globalAlpha = 1;
         return;
       }
       bshadow(nx - cx + 8, ny - cy + 14, 5);
@@ -889,11 +889,11 @@ function drawMapHUD() {
 
 // ===================== BATTLE =====================
 function makeEnemy(id) {
-  const d = ENEMIES[id], sz = d.boss ? { w: 100, h: 92 } : { w: 16 * BS(), h: 15 * BS() };
+  const d = ENEMIES[id], sz = ART.enemySize(d.shape);
   return { id, d, sz, name: d.name, hp: d.hp, maxhp: d.hp, atk: d.atk, def: d.def, agi: d.agi, x: 0, y: 0, flash: 0, shake: 0, alive: true, dying: 0, lunge: 0 };
 }
 const bY = () => Math.round(H * 0.6) + 6;
-const BS = () => (H >= 280 ? 3 : 2);
+const BS = () => 2;
 const heroPos = (i) => ({ x: (BS() === 3 ? 202 : 212) + i * (BS() === 3 ? 30 : 26), y: bY() - 10 + i * (BS() === 3 ? 18 : 11) });
 const enemyHit = (e) => ({ x: e.x, y: e.y - e.sz.h * 0.5 - (e.d.float ? 6 : 0) });
 function anim(name, x, y, sc = 2, ms = 60) { if (B) B.anims.push({ name, x, y, sc, ms, t: 0 }); }
@@ -957,7 +957,7 @@ async function battle(ids, opt = {}) {
 }
 function layoutEnemies() {
   const al = B.enemies, n = al.length;
-  const xs = BS() === 3 ? ([[90], [58, 124], [36, 92, 148]][n - 1] || [90]) : ([[92], [66, 124], [44, 96, 148]][n - 1] || [92]);
+  const xs = [[92], [62, 126], [38, 94, 150]][n - 1] || [92];
   al.forEach((e, i) => { e.x = e.d.boss ? 92 : xs[i]; e.y = e.d.boss ? bY() + 18 : bY() + (n === 3 && i === 1 ? 10 : 0) + (n === 2 && i === 1 ? 8 : 0); });
 }
 function checkEnd() { if (B.enemies.every((e) => !e.alive)) return 'win'; if (state.party.every((m) => m.hp <= 0)) return 'lose'; return null; }
@@ -1268,8 +1268,8 @@ function renderBattle(dt) {
     e.flash = Math.max(0, e.flash - dt); e.shake = Math.max(0, e.shake - dt); e.lunge = Math.max(0, e.lunge - dt);
     if (!e.alive) { e.dying = Math.max(0, e.dying - dt / 450); if (e.dying <= 0) continue; }
     const fl = (e.flash > 0 && Math.floor(e.flash / 60) % 2 === 0) || !e.alive;
-    const im = ART.enemySprite(e.d.shape, Math.floor(T / (e.d.boss ? 140 : 170)), fl);
-    const sc = e.d.boss ? 2 : BS(), w = im.width * sc, h = im.height * sc;
+    const im = ART.enemySprite(e.d.shape, 0, fl);
+    const br = e.d.float ? 0 : Math.sin(T / 260 + e.x) * 0.03, w = im.width, h = Math.round(im.height * (1 + br));
     const ox = (e.shake > 0 ? Math.round(Math.sin(T / 14) * 2) : 0) + (e.lunge > 0 ? Math.round(Math.sin((e.lunge / 300) * Math.PI) * 14) : 0);
     const oy = e.d.float ? Math.round(Math.sin(T / 300 + e.x) * 3) - 6 : 0;
     bx.fillStyle = 'rgba(10,0,20,0.28)'; bx.beginPath(); bx.ellipse(e.x, e.y - 1, w * 0.34, 4, 0, 0, 6.3); bx.fill();

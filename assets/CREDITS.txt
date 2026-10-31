@@ -4,3 +4,11 @@ Released under Creative Commons Zero (CC0). Thank you!
 
 Only the pieces Rootwell uses are included; music was converted from OGG to MP3.
 Rebuild with: python3 tools/build_assets.py "/path/to/Ninja Adventure - Asset Pack"
+
+Battle monsters (assets/monsters) come from two free packs, used under their licenses
+(free for personal and commercial use, no redistribution as standalone assets):
+  - Pipoya Free RPG Monster Pack by Pipoya: https://pipoya.itch.io/free-rpg-monster-pack
+    (slime, mushroom, ghost, wraith; downscaled and pixelated for this game)
+  - Creature Collector 64x64 by dadddydarko: https://dadddydarko.itch.io/creature-collector-64x64-2d-various-creatures-with-different-themes
+    (turtle, moth, squirrel, wasp, worm)
+Rebuild with: python3 tools/build_monsters.py <Pipoya "non shade" folder> <"Static Creatures" folder>

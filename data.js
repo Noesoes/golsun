@@ -72,20 +72,20 @@ const ITEMS = {
 const SHOP_LIST = ['herb', 'tea', 'salts', 'tinblade', 'quilted', 'steelblade', 'chain', 'starsteel', 'moonweave'];
 
 const ENEMIES = {
-  puddle: { name: 'Puddlejelly', shape: 'Slime3', hp: 20, atk: 8, def: 3, agi: 5, xp: 8, gold: 4, weak: 'bloom', resist: 'ember' },
-  burrbun: { name: 'Rascal Raccoon', shape: 'Racoon', hp: 24, atk: 10, def: 4, agi: 9, xp: 10, gold: 6, weak: 'ember' },
-  wasp: { name: 'Thistlewing', shape: 'Butterfly', hp: 18, atk: 11, def: 2, agi: 14, xp: 10, gold: 6, weak: 'gale', float: true },
-  mudsnout: { name: 'Mudsnout', shape: 'Mole', hp: 36, atk: 13, def: 8, agi: 4, xp: 16, gold: 10, weak: 'bloom', resist: 'gale',
+  puddle: { name: 'Puddlejelly', shape: 'slime', hp: 20, atk: 8, def: 3, agi: 5, xp: 8, gold: 4, weak: 'bloom', resist: 'ember' },
+  burrbun: { name: 'Nutsnatcher', shape: 'squirrel', hp: 24, atk: 10, def: 4, agi: 9, xp: 10, gold: 6, weak: 'ember' },
+  wasp: { name: 'Thistle Wasp', shape: 'wasp', hp: 18, atk: 11, def: 2, agi: 14, xp: 10, gold: 6, weak: 'gale', float: true },
+  mudsnout: { name: 'Mudworm', shape: 'worm', hp: 36, atk: 13, def: 8, agi: 4, xp: 16, gold: 10, weak: 'bloom', resist: 'gale',
     arts: [{ name: 'Mud Toss', elem: 'bloom', power: 12, target: 'one', chance: 0.3 }] },
-  glowcap: { name: 'Glowcap', shape: 'Mushroom2', hp: 44, atk: 15, def: 8, agi: 8, xp: 24, gold: 16, weak: 'ember', resist: 'bloom',
+  glowcap: { name: 'Glowcap', shape: 'mushroom', hp: 44, atk: 15, def: 8, agi: 8, xp: 24, gold: 16, weak: 'ember', resist: 'bloom',
     arts: [{ name: 'Spore Puff', elem: 'bloom', power: 13, target: 'all', chance: 0.35 }] },
-  shellback: { name: 'Shellback', shape: 'Mollusc2', hp: 78, atk: 20, def: 15, agi: 3, xp: 34, gold: 22, weak: 'bloom', resist: 'gale',
+  shellback: { name: 'Shellback', shape: 'turtle', hp: 78, atk: 20, def: 15, agi: 3, xp: 34, gold: 22, weak: 'bloom', resist: 'gale',
     arts: [{ name: 'Shell Slam', elem: 'hush', power: 26, target: 'one', chance: 0.25 }] },
-  hushmoth: { name: 'Hushmoth', shape: 'ButterflyBlue', hp: 34, atk: 16, def: 6, agi: 15, xp: 20, gold: 12, weak: 'gale', float: true,
+  hushmoth: { name: 'Hushmoth', shape: 'moth', hp: 34, atk: 16, def: 6, agi: 15, xp: 20, gold: 12, weak: 'gale', float: true,
     arts: [{ name: 'Silent Dust', elem: 'hush', power: 10, target: 'all', chance: 0.25 }] },
-  hushling: { name: 'Hushling', shape: 'Spirit', hp: 38, atk: 17, def: 7, agi: 12, xp: 24, gold: 14, weak: 'ember', resist: 'bloom', float: true,
+  hushling: { name: 'Hushling', shape: 'ghost', hp: 38, atk: 17, def: 7, agi: 12, xp: 24, gold: 14, weak: 'ember', resist: 'bloom', float: true,
     arts: [{ name: 'Chill Whisper', elem: 'hush', power: 14, target: 'one', chance: 0.3 }] },
-  queen: { name: 'Hush Wraith', shape: 'GiantSpirit', hp: 520, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
+  queen: { name: 'Hush Wraith', shape: 'wraith', hp: 520, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
     arts: [{ name: 'Mournful Wail', elem: 'hush', power: 20, target: 'all', chance: 0.3 }, { name: 'Hush Drain', elem: 'hush', power: 32, target: 'one', chance: 0.3, drain: true }] },
 };
 const ENCOUNTERS = {

@@ -58,6 +58,7 @@ python3 -m http.server 8000
 - `art.js`: loads the sprite sheets and slices them into tiles, props, characters, portraits, enemies and effects
 - `assets/`: the art and music used by the game (see credits below)
 - `tools/build_assets.py`: copies the needed pieces out of the asset pack and converts the music
+- `tools/build_monsters.py`: builds the battle monsters from the two monster packs
 - `game.js`: engine (rendering, input, maps, battles, menus, audio)
 - `data.js`: heroes, skills, Trinkets, items, enemies, maps and the story
 - `sw.js`, `manifest.webmanifest`, `icon-*.png`: installable, offline-capable app (PWA)
@@ -66,6 +67,7 @@ python3 -m http.server 8000
 ## Credits
 
 - Art, music and jingles: [Ninja Adventure asset pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack) by Pixel-Boy and AAA, released under CC0.
+- Battle monsters: [Pipoya Free RPG Monster Pack](https://pipoya.itch.io/free-rpg-monster-pack) and [Creature Collector 64x64](https://dadddydarko.itch.io/creature-collector-64x64-2d-various-creatures-with-different-themes) by dadddydarko.
 - Font: Pixelify Sans, licensed under the SIL Open Font License.
 
 Rootwell's world, characters, story and mechanics are original to this project.
