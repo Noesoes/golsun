@@ -1,13 +1,13 @@
 {
-  "name": "Dawnbeacon",
-  "short_name": "Dawnbeacon",
-  "description": "A pocket elemental RPG: explore, solve puzzles with elemental powers, collect Wisps and battle the Gloom.",
+  "name": "Rootwell",
+  "short_name": "Rootwell",
+  "description": "A cozy pixel-art adventure RPG. Explore Mossbell Vale, solve puzzles with your tools, and wake the singing spring.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",
   "orientation": "any",
-  "background_color": "#0d0a1a",
-  "theme_color": "#120c24",
+  "background_color": "#0d0918",
+  "theme_color": "#140c24",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }

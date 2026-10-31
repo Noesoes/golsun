@@ -3,54 +3,59 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#120c24">
+<meta name="theme-color" content="#140c24">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Dawnbeacon">
-<meta name="description" content="Dawnbeacon: a pocket elemental RPG. Explore, solve puzzles with elemental powers, collect Wisps and battle the Gloom.">
+<meta name="apple-mobile-web-app-title" content="Rootwell">
+<meta name="description" content="Rootwell: a cozy pixel-art adventure RPG. Explore Mossbell Vale, solve puzzles with your tools, and wake the singing spring.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>Dawnbeacon</title>
+<link rel="preload" href="fonts/pixelify.woff2" as="font" type="font/woff2" crossorigin>
+<title>Rootwell</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #0d0a1a; overflow: hidden; touch-action: none;
+  @font-face { font-family: 'Pixelify'; src: url(fonts/pixelify.woff2) format('woff2'); font-weight: 400 700; font-display: swap; }
+  html, body { margin: 0; height: 100%; background: #0d0918; overflow: hidden; touch-action: none; overscroll-behavior: none;
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
-    font-family: "Trebuchet MS", Verdana, sans-serif; color: #dfe6ff; }
+    font-family: Pixelify, "Trebuchet MS", sans-serif; color: #e8dcff; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; }
+  body { background: radial-gradient(ellipse at 50% 0%, #2a1a44 0%, #0d0918 60%); }
   #app { position: fixed; inset: 0; display: flex; flex-direction: column;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-  #screen { position: relative; flex: 0 0 auto; width: 100%; height: min(66.67vw, 62vh); display: flex; align-items: center; justify-content: center; }
-  #game { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; box-shadow: 0 0 0 2px #2a2050, 0 6px 24px #000; }
-  #controls { position: relative; flex: 1; min-height: 190px; }
-  #dpad { position: absolute; left: 6%; top: 50%; transform: translateY(-50%); width: 150px; height: 150px; touch-action: none; }
-  #dpad .arm { position: absolute; background: #2c2650; border: 2px solid #4a4280; box-shadow: inset 0 -3px 0 #1c1838; }
-  #dpad .h { left: 0; right: 0; top: 50px; height: 46px; border-radius: 10px; }
-  #dpad .v { top: 0; bottom: 0; left: 50px; width: 46px; border-radius: 10px; }
-  #dpad .hub { position: absolute; left: 52px; top: 52px; width: 46px; height: 46px; background: #2c2650; }
-  #dpad .tri { position: absolute; width: 0; height: 0; border: 9px solid transparent; opacity: .75; }
-  #dpad .tu { left: 66px; top: 8px; border-bottom: 12px solid #cfd6ff; border-top: 0; }
-  #dpad .td { left: 66px; bottom: 8px; border-top: 12px solid #cfd6ff; border-bottom: 0; }
-  #dpad .tl { top: 66px; left: 8px; border-right: 12px solid #cfd6ff; border-left: 0; }
-  #dpad .tr { top: 66px; right: 8px; border-left: 12px solid #cfd6ff; border-right: 0; }
-  #dpad[data-dir="up"] .tu, #dpad[data-dir="down"] .td, #dpad[data-dir="left"] .tl, #dpad[data-dir="right"] .tr { opacity: 1; filter: drop-shadow(0 0 4px #ffe08a); }
-  #btns { position: absolute; right: 5%; top: 50%; transform: translateY(-50%); width: 170px; height: 170px; }
-  .btn { position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; touch-action: none;
-    color: #fff; box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), 0 3px 8px rgba(0,0,0,.5); font-size: 22px; }
-  .btn.on { transform: scale(.92); filter: brightness(1.3); }
-  .btn small { position: absolute; bottom: -17px; font-size: 10px; font-weight: normal; color: #9aa4d8; white-space: nowrap; }
-  .btn[data-k="a"] { width: 66px; height: 66px; right: 0; top: 34px; background: radial-gradient(circle at 35% 30%, #ff8a6a, #c8382a); }
-  .btn[data-k="b"] { width: 58px; height: 58px; right: 78px; top: 82px; background: radial-gradient(circle at 35% 30%, #f8d070, #b8862a); }
-  .btn[data-k="p"] { width: 44px; height: 44px; right: 84px; top: 4px; font-size: 20px; background: radial-gradient(circle at 35% 30%, #a8a0ff, #5a48c8); }
-  .btn[data-k="m"] { width: 40px; height: 40px; right: 14px; top: 124px; font-size: 18px; background: radial-gradient(circle at 35% 30%, #8090b0, #3a4660); }
+  #screen { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding-top: 4px; }
+  #game { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; border-radius: 4px;
+    box-shadow: 0 0 0 2px #3a2a5a, 0 0 0 4px #1a1028, 0 10px 30px rgba(0,0,0,.6); }
+  #controls { position: relative; flex: 1 1 auto; min-height: 176px; }
+  #dpad { position: absolute; left: 5%; top: 50%; transform: translateY(-50%); width: 148px; height: 148px; touch-action: none; }
+  #dpad .arm { position: absolute; background: linear-gradient(#3a2e5e, #2a2148); border: 2px solid #574a8a; box-shadow: inset 0 -4px 0 rgba(0,0,0,.3); }
+  #dpad .h { left: 0; right: 0; top: 49px; height: 46px; border-radius: 12px; }
+  #dpad .v { top: 0; bottom: 0; left: 49px; width: 46px; border-radius: 12px; }
+  #dpad .hub { position: absolute; left: 51px; top: 51px; width: 46px; height: 46px; background: #30264f; border-radius: 4px; }
+  #dpad .hub::after { content: ''; position: absolute; left: 15px; top: 15px; width: 16px; height: 16px; border-radius: 50%; background: #251c40; }
+  #dpad .tri { position: absolute; width: 0; height: 0; border: 9px solid transparent; opacity: .7; transition: opacity .08s; }
+  #dpad .tu { left: 65px; top: 9px; border-bottom: 12px solid #e6dcff; border-top: 0; }
+  #dpad .td { left: 65px; bottom: 9px; border-top: 12px solid #e6dcff; border-bottom: 0; }
+  #dpad .tl { top: 65px; left: 9px; border-right: 12px solid #e6dcff; border-left: 0; }
+  #dpad .tr { top: 65px; right: 9px; border-left: 12px solid #e6dcff; border-right: 0; }
+  #dpad[data-dir="up"] .tu, #dpad[data-dir="down"] .td, #dpad[data-dir="left"] .tl, #dpad[data-dir="right"] .tr { opacity: 1; filter: drop-shadow(0 0 5px #ffd36a); }
+  #btns { position: absolute; right: 4%; top: 50%; transform: translateY(-50%); width: 176px; height: 160px; }
+  .btn { position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; touch-action: none;
+    color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.35); box-shadow: inset 0 -5px 0 rgba(0,0,0,.3), inset 0 3px 0 rgba(255,255,255,.25), 0 4px 10px rgba(0,0,0,.5);
+    font-size: 24px; transition: transform .06s, filter .06s; }
+  .btn.on { transform: scale(.9); filter: brightness(1.25); }
+  .btn small { position: absolute; bottom: -17px; font-size: 11px; font-weight: 400; color: #a89cd0; white-space: nowrap; text-shadow: none; }
+  .btn[data-k="a"] { width: 68px; height: 68px; right: 0; top: 30px; background: radial-gradient(circle at 35% 30%, #ff9a7a, #d23e3e); }
+  .btn[data-k="b"] { width: 58px; height: 58px; right: 80px; top: 78px; background: radial-gradient(circle at 35% 30%, #ffe08a, #c08a2a); }
+  .btn[data-k="p"] { width: 46px; height: 46px; right: 88px; top: 2px; font-size: 20px; background: radial-gradient(circle at 35% 30%, #8ff0c8, #2a8a7a); }
+  .btn[data-k="p"].ready { animation: pulse 0.9s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: inset 0 -5px 0 rgba(0,0,0,.3), 0 0 0 0 rgba(143,240,200,.7); } 50% { box-shadow: inset 0 -5px 0 rgba(0,0,0,.3), 0 0 0 8px rgba(143,240,200,0); } }
+  .btn[data-k="m"] { width: 42px; height: 42px; right: 12px; top: 116px; font-size: 18px; background: radial-gradient(circle at 35% 30%, #a898d0, #4a3e78); }
   @media (orientation: landscape) and (max-height: 600px) {
-    #screen { position: absolute; top: 0; bottom: 0; left: 150px; right: 150px; width: auto; height: auto; }
-    #controls { position: absolute; inset: 0; pointer-events: none; }
+    #screen { position: absolute; top: 4px; bottom: 4px; left: 150px; right: 150px; }
+    #controls { position: absolute; inset: 0; height: auto; pointer-events: none; }
     #dpad, #btns { pointer-events: auto; }
-    #dpad { left: 8px; top: auto; bottom: 18px; transform: scale(.88); transform-origin: left bottom; }
-    #btns { right: 4px; top: auto; bottom: 22px; transform: scale(.8); transform-origin: right bottom; }
-  }
-  @media (min-width: 900px) and (min-height: 700px) {
-    #screen { height: min(66.67vw, 72vh); }
+    #dpad { left: 6px; top: auto; bottom: 16px; transform: scale(.88); transform-origin: left bottom; }
+    #btns { right: 2px; top: auto; bottom: 20px; transform: scale(.8); transform-origin: right bottom; }
   }
 </style>
 </head>
@@ -63,13 +68,14 @@
       <div class="tri tu"></div><div class="tri td"></div><div class="tri tl"></div><div class="tri tr"></div>
     </div>
     <div id="btns">
-      <div class="btn" data-k="p">✦<small>Power</small></div>
+      <div class="btn" data-k="p">✦<small>Tool</small></div>
       <div class="btn" data-k="a">A<small>Action</small></div>
       <div class="btn" data-k="b">B<small>Back / Run</small></div>
       <div class="btn" data-k="m">☰<small>Menu</small></div>
     </div>
   </div>
 </div>
+<script src="art.js"></script>
 <script src="data.js"></script>
 <script src="game.js"></script>
 </body>

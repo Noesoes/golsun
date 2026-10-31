@@ -1,43 +1,48 @@
-# Dawnbeacon
+# Rootwell: Song of Mossbell Vale
 
-A pocket-sized elemental adventure RPG that runs in your phone's browser and installs to your home screen like an app. It works offline once installed.
+A cozy pixel-art adventure RPG that runs in your phone's browser and installs to your home screen like an app. It works offline once installed.
 
-You play Kai, Lyra and Fen, three young adepts attuned to the elements. Together you travel from the village of Brindlewood, across Windmere Fields and into Whisper Grotto to relight the Dawnbeacon and drive back the Gloom.
+**Play it:** https://noesoes.github.io/golsun/
+
+## The story
+
+Mossbell Vale has always bloomed. Beneath the old hill, the **Rootwell** spring hums a quiet song, and wherever its water flows, flowers follow. Three days ago the humming stopped, and the petals began to turn gray.
+
+You play as three friends:
+
+- **Wren**, a young cartographer carrying her mother's gale gauntlet.
+- **Bram**, a gentle blacksmith with a forge lantern.
+- **Tamsin**, a botanist from Larkspur College who studies the spring.
+
+Together they travel through Windmere Fields and into Whisper Grotto to find out what silenced the spring.
 
 ## Features
 
-- **Elemental field powers for puzzles.** Kai's *Shove* pushes boulders, even into pits. Lyra's *Kindle* burns away thorn thickets. Fen's *Chill* freezes rivers into ice bridges.
-- **Turn-based battles.** Each turn you can Fight, cast Arts (elemental spells), use items, Defend or Flee. Enemies have elemental weaknesses and resistances.
-- **Wisps.** Four hidden elemental spirits to collect. Each one boosts the stats of the hero carrying it. In battle you can unleash a Wisp for a powerful effect, but it then rests for a couple of turns.
-- **RPG basics.** Levels, new Arts, a shop, an inn, gear, treasure chests, a boss fight and an ending.
-- **Original music and sound effects**, all generated live in the browser.
-- **Saving.** Save from the menu at any time. Staying at the inn also saves.
+- **Hand-crafted pixel art.** Every sprite, tile and portrait is drawn in code: outlined characters with walk cycles, auto-tiled terrain, overlapping tree canopies, lighting and darkness in caves, chimney smoke, drifting petals and more.
+- **Tool puzzles.** Wren's *Gust* blows boulders across the floor, even into pits. Bram's *Kindle* burns away brambles. Tamsin's *Lilypad* seeds grow pads you can walk across water on.
+- **Side-view turn-based battles.** Use skills, items and Guard, and exploit Gale, Ember and Bloom weaknesses. Your party shares a **Harmony** gauge; when it's full, unleash a hero's **Burst** move.
+- **Trinkets.** Four hidden charms with passive bonuses. Each hero can wear one.
+- **Phone-friendly controls.** Tap anywhere to walk there, and tap people or objects to interact. You can also use the D-pad and buttons. Prompts show what you can interact with, and the A button's label changes to match (Talk, Open, Use...).
+- **Quality of life.** A goal tracker, autosave whenever you change areas, "Try again" after losing a battle, an Auto-battle command, and settings for music, sound and text speed.
+- **Music and sound effects** generated live in the browser.
 
 ## Controls
 
-| Touch            | Keyboard            | Action                                  |
-|------------------|---------------------|-----------------------------------------|
-| D-pad            | Arrows / WASD       | Move, choose menu options               |
-| **A**            | Z / Enter / Space   | Talk, examine, confirm                  |
-| **B**            | X / Esc / Shift     | Cancel; hold to run                     |
-| **✦ Power**      | C / Q               | Use an elemental power on what you face |
-| **☰ Menu**       | M / Tab             | Party, items, Arts, Wisps, save, sound  |
-
-You can also tap menu items and enemies directly on the screen.
+| Touch       | Keyboard          | Action                                       |
+|-------------|-------------------|----------------------------------------------|
+| Tap screen  | –                 | Walk somewhere; tap people or things to interact |
+| D-pad       | Arrows / WASD     | Move, choose menu options                    |
+| **A**       | Z / Enter / Space | Talk, open, use a tool, confirm              |
+| **B**       | X / Esc / Shift   | Back; hold to run                            |
+| **✦ Tool**  | C / Q             | Use the right tool on what you're facing     |
+| **☰ Menu**  | M / Tab           | Status, items, skills, Trinkets, settings, save |
 
 ## Installing on your phone
 
-1. Open the game's URL in your phone's browser. See "Hosting" below for the URL.
-2. **iPhone (Safari):** tap Share, then **Add to Home Screen**.
-   **Android (Chrome):** tap ⋮, then **Install app** (or **Add to Home screen**).
-3. Launch Dawnbeacon from the new home-screen icon. It opens full screen and works offline.
-
-## Hosting (GitHub Pages)
-
-This repository includes a workflow (`.github/workflows/pages.yml`) that publishes the game whenever `main` is updated.
-
-1. On GitHub, go to **Settings → Pages** and set **Source** to **GitHub Actions**.
-2. Push or merge to `main`. The game will appear at `https://<your-username>.github.io/<repo-name>/`.
+1. Open https://noesoes.github.io/golsun/ on your phone.
+2. **iPhone:** in Safari, tap Share, then **Add to Home Screen**.
+   **Android:** in Chrome, tap ⋮, then **Install app** (or **Add to Home screen**).
+3. Launch Rootwell from the new icon. It opens full screen and works offline.
 
 ## Running locally
 
@@ -50,7 +55,11 @@ python3 -m http.server 8000
 
 ## Files
 
-- `index.html`: page layout and on-screen touch controls
+- `index.html`: page layout and touch controls
+- `art.js`: procedural pixel art (tiles, props, characters, portraits, enemies, icons)
 - `game.js`: engine (rendering, input, maps, battles, menus, audio)
-- `data.js`: heroes, Arts, Wisps, items, enemies, maps and story scripts
+- `data.js`: heroes, skills, Trinkets, items, enemies, maps and the story
 - `sw.js`, `manifest.webmanifest`, `icon-*.png`: installable, offline-capable app (PWA)
+- `fonts/`: [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans), licensed under the SIL Open Font License (see `fonts/OFL.txt`)
+
+Rootwell is an original game. Its world, characters, story and mechanics were created for this project.

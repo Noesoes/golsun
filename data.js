@@ -1,324 +1,375 @@
 'use strict';
-// ===================== Dawnbeacon — game data =====================
+// ===================== Rootwell — game data & story =====================
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
-const ELEM_COL = { terra: '#e0b050', flame: '#ff7a3a', gale: '#a8f07a', tide: '#5ab8ff', gloom: '#b070ff' };
-const ELEM_NAME = { terra: 'Terra', flame: 'Flame', gale: 'Gale', tide: 'Tide', gloom: 'Gloom' };
+const ELEM_COL = { gale: '#8ff0c8', ember: '#ff9040', bloom: '#9ae86a', hush: '#c0a8f0' };
+const ELEM_NAME = { gale: 'Gale', ember: 'Ember', bloom: 'Bloom', hush: 'Hush' };
 
 const HEROES = {
-  kai: {
-    name: 'Kai', elem: 'terra', field: 'shove',
-    look: { skin: '#f1c493', hair: '#7a4520', tunic: '#3d7a3a', pants: '#5a4630', accent: '#e6c34a', style: 'spiky', scarf: true },
-    base: { hp: 34, ep: 12, atk: 11, def: 7, agi: 7 }, grow: { hp: 6.5, ep: 2.5, atk: 2.4, def: 1.6, agi: 1.2 },
-    arts: [['quake', 1], ['mend', 1], ['spire', 4], ['monolith', 7]],
+  wren: {
+    name: 'Wren', elem: 'gale', field: 'gust', role: 'Cartographer',
+    look: { skin: '#f2c8a0', hair: '#4a2e22', hairStyle: 'bob', top: '#e8dcc0', bottom: '#5a4a6a', cape: '#2f8f86', feather: '#e8604a', belt: '#7a4a2a', sash: '#7a4a2a' },
+    base: { hp: 32, fp: 14, atk: 10, def: 6, agi: 10 }, grow: { hp: 6, fp: 3, atk: 2.2, def: 1.4, agi: 1.6 },
+    skills: [['gustedge', 1], ['tailwind', 2], ['cyclone', 3], ['galelance', 5], ['tempest', 7]], burst: 'skyrend',
   },
-  lyra: {
-    name: 'Lyra', elem: 'flame', field: 'kindle',
-    look: { skin: '#f6d0a8', hair: '#c8402a', tunic: '#7a3a8a', pants: '#3a2a4a', accent: '#ffb040', style: 'long' },
-    base: { hp: 28, ep: 18, atk: 9, def: 5, agi: 10 }, grow: { hp: 5.5, ep: 3.5, atk: 1.9, def: 1.3, agi: 1.6 },
-    arts: [['flare', 1], ['rally', 2], ['blaze', 3], ['inferno', 6]],
+  bram: {
+    name: 'Bram', elem: 'ember', field: 'kindle', role: 'Blacksmith',
+    look: { skin: '#e8b48a', hair: '#c0582a', hairStyle: 'messy', top: '#b84a3a', bottom: '#4a3a32', apron: '#7a5232', beard: '#b0502a', build: 'broad', lantern: true },
+    base: { hp: 40, fp: 10, atk: 12, def: 8, agi: 6 }, grow: { hp: 7.5, fp: 2.2, atk: 2.6, def: 1.8, agi: 1 },
+    skills: [['cinder', 1], ['firstaid', 1], ['ironhide', 2], ['flamewall', 3], ['forgeburst', 5]], burst: 'starforge',
   },
-  fen: {
-    name: 'Fen', elem: 'tide', field: 'chill',
-    look: { skin: '#d9a878', hair: '#2a4a8a', tunic: '#2a8a9a', pants: '#2a3a5a', accent: '#e0f0ff', style: 'short' },
-    base: { hp: 30, ep: 16, atk: 9, def: 6, agi: 8 }, grow: { hp: 6, ep: 3.2, atk: 2, def: 1.5, agi: 1.3 },
-    arts: [['frost', 1], ['restore', 1], ['wellspring', 4], ['renewal', 5], ['glacier', 6]],
+  tamsin: {
+    name: 'Tamsin', elem: 'bloom', field: 'bloom', role: 'Botanist',
+    look: { skin: '#f6d2b0', hair: '#3a6a3a', hairStyle: 'braid', top: '#f0e8d0', dress: '#5a9a5a', glasses: true, crown: true, accent: '#ff80b0' },
+    base: { hp: 28, fp: 18, atk: 8, def: 5, agi: 9 }, grow: { hp: 5.2, fp: 3.6, atk: 1.8, def: 1.2, agi: 1.4 },
+    skills: [['mendpetal', 1], ['thornsnare', 1], ['blossomrain', 3], ['reviveseed', 4], ['briarstorm', 6]], burst: 'verdant',
   },
 };
 
-const ARTS = {
-  quake: { name: 'Quake', elem: 'terra', ep: 4, type: 'dmg', target: 'allEnemies', power: 14, desc: 'Terra: shake the earth under all foes.' },
-  mend: { name: 'Mend', elem: 'terra', ep: 3, type: 'heal', target: 'ally', power: 32, desc: 'Restore about 32 HP to one ally.' },
-  spire: { name: 'Stone Spire', elem: 'terra', ep: 6, type: 'dmg', target: 'enemy', power: 44, desc: 'Terra: impale one foe on a stone spike.' },
-  monolith: { name: 'Monolith', elem: 'terra', ep: 11, type: 'dmg', target: 'allEnemies', power: 46, desc: 'Terra: crush all foes under falling stone.' },
-  flare: { name: 'Flare', elem: 'flame', ep: 3, type: 'dmg', target: 'enemy', power: 20, desc: 'Flame: scorch a single foe.' },
-  rally: { name: 'Rally', elem: 'flame', ep: 5, type: 'buff', stat: 'atk', target: 'allAllies', desc: "Raise all allies' attack for 3 turns." },
-  blaze: { name: 'Blaze', elem: 'flame', ep: 6, type: 'dmg', target: 'allEnemies', power: 22, desc: 'Flame: engulf all foes in fire.' },
-  inferno: { name: 'Inferno', elem: 'flame', ep: 11, type: 'dmg', target: 'allEnemies', power: 48, desc: 'Flame: a towering firestorm.' },
-  frost: { name: 'Frost', elem: 'tide', ep: 3, type: 'dmg', target: 'enemy', power: 20, desc: 'Tide: pierce one foe with ice.' },
-  restore: { name: 'Restore', elem: 'tide', ep: 3, type: 'heal', target: 'ally', power: 40, desc: 'Restore about 40 HP to one ally.' },
-  wellspring: { name: 'Wellspring', elem: 'tide', ep: 8, type: 'heal', target: 'allAllies', power: 34, desc: 'Restore about 34 HP to all allies.' },
-  renewal: { name: 'Renewal', elem: 'tide', ep: 10, type: 'revive', target: 'deadAlly', desc: 'Revive a fallen ally with half HP.' },
-  glacier: { name: 'Glacier', elem: 'tide', ep: 11, type: 'dmg', target: 'allEnemies', power: 46, desc: 'Tide: bury all foes under a glacier.' },
+const SKILLS = {
+  gustedge: { name: 'Gust Edge', elem: 'gale', fp: 3, type: 'dmg', target: 'enemy', power: 20, desc: 'Gale: slice one foe with a blade of wind.' },
+  tailwind: { name: 'Tailwind', elem: 'gale', fp: 5, type: 'buff', stat: 'atk', target: 'allAllies', desc: "Raise the whole party's attack for 3 turns." },
+  cyclone: { name: 'Cyclone', elem: 'gale', fp: 6, type: 'dmg', target: 'allEnemies', power: 22, desc: 'Gale: a whirlwind strikes every foe.' },
+  galelance: { name: 'Gale Lance', elem: 'gale', fp: 7, type: 'dmg', target: 'enemy', power: 50, desc: 'Gale: a piercing spear of wind.' },
+  tempest: { name: 'Tempest', elem: 'gale', fp: 11, type: 'dmg', target: 'allEnemies', power: 46, desc: 'Gale: summon a roaring storm on all foes.' },
+  cinder: { name: 'Cinder Strike', elem: 'ember', fp: 3, type: 'dmg', target: 'enemy', power: 24, desc: 'Ember: a red-hot hammer blow.' },
+  firstaid: { name: 'First Aid', elem: 'ember', fp: 3, type: 'heal', target: 'ally', power: 28, desc: 'Patch up one ally for about 28 HP.' },
+  ironhide: { name: 'Ironhide', elem: 'ember', fp: 5, type: 'buff', stat: 'def', target: 'allAllies', desc: "Raise the whole party's defense for 3 turns." },
+  flamewall: { name: 'Flame Wall', elem: 'ember', fp: 6, type: 'dmg', target: 'allEnemies', power: 22, desc: 'Ember: a wall of fire sweeps all foes.' },
+  forgeburst: { name: 'Forge Burst', elem: 'ember', fp: 7, type: 'dmg', target: 'enemy', power: 56, desc: 'Ember: an explosive strike on one foe.' },
+  mendpetal: { name: 'Mend Petal', elem: 'bloom', fp: 3, type: 'heal', target: 'ally', power: 38, desc: 'Heal one ally for about 38 HP.' },
+  thornsnare: { name: 'Thornsnare', elem: 'bloom', fp: 3, type: 'dmg', target: 'enemy', power: 18, desc: 'Bloom: lash one foe with thorny vines.' },
+  blossomrain: { name: 'Blossom Rain', elem: 'bloom', fp: 8, type: 'heal', target: 'allAllies', power: 32, desc: 'Heal every ally for about 32 HP.' },
+  reviveseed: { name: 'Revive Seed', elem: 'bloom', fp: 10, type: 'revive', target: 'deadAlly', desc: 'Revive a fallen ally with half HP.' },
+  briarstorm: { name: 'Briar Storm', elem: 'bloom', fp: 11, type: 'dmg', target: 'allEnemies', power: 44, desc: 'Bloom: a storm of briars hits all foes.' },
 };
-
-// Wisps: elemental spirits. Set on a hero they boost stats; unleash them in battle
-// for a big effect, after which they rest for 2 rounds (and their boost is lost meanwhile).
-const WISPS = {
-  pebble: { name: 'Pebble', elem: 'terra', bonus: { hp: 8, def: 2 }, un: { name: 'Landslide', type: 'dmg', target: 'enemy', power: 42 } },
-  cinder: { name: 'Cinder', elem: 'flame', bonus: { atk: 3, ep: 3 }, un: { name: 'Ember Rain', type: 'dmg', target: 'allEnemies', power: 28 } },
-  zephyr: { name: 'Zephyr', elem: 'gale', bonus: { agi: 4, hp: 5 }, un: { name: 'Tailwind Ward', type: 'buff', stat: 'def', target: 'allAllies' } },
-  droplet: { name: 'Droplet', elem: 'tide', bonus: { ep: 4, hp: 6 }, un: { name: 'Soothing Rain', type: 'heal', target: 'allAllies', power: 40 } },
+// Bursts: powerful moves that spend the party's full Harmony gauge.
+const BURSTS = {
+  skyrend: { name: 'Skyrend', elem: 'gale', type: 'dmg', target: 'allEnemies', power: 78, desc: 'Wren tears the sky open over every foe.' },
+  starforge: { name: 'Starforge Hammer', elem: 'ember', type: 'dmg', target: 'enemy', power: 135, desc: 'Bram brings down a hammer of white-hot starmetal.' },
+  verdant: { name: 'Verdant Chorus', elem: 'bloom', type: 'fullheal', target: 'allAllies', desc: 'Tamsin fully heals and revives the whole party.' },
+};
+// Trinkets: hidden charms. Each hero can wear one.
+const TRINKETS = {
+  foxbell: { name: 'Fox Bell', desc: 'AGI +6. Its jingle puts a spring in your step.', bonus: { agi: 6 } },
+  thimble: { name: 'Ember Thimble', desc: 'Skills deal 20% more damage.', skillMul: 1.2 },
+  owlquill: { name: 'Owl Quill', desc: 'Restores 2 FP at the end of each round.', fpRegen: 2 },
+  mosslocket: { name: 'Moss Locket', desc: 'Restores 8% HP at the end of each round.', regen: 0.08 },
 };
 
 const ITEMS = {
-  herb: { name: 'Herb', price: 10, use: 'heal', power: 40, target: 'ally', desc: 'Restores 40 HP to one ally.' },
-  tonic: { name: 'Spirit Tonic', price: 20, use: 'ep', power: 15, target: 'ally', desc: 'Restores 15 EP to one ally.' },
-  plume: { name: 'Phoenix Plume', price: 60, use: 'revive', target: 'deadAlly', desc: 'Revives a fallen ally with half HP.' },
-  sunberry: { name: 'Sunberry', price: 80, use: 'healAll', power: 60, target: 'allAllies', desc: 'Restores 60 HP to every ally.' },
-  shortsword: { name: 'Short Sword', price: 70, slot: 'weapon', atk: 4 },
-  longsword: { name: 'Longsword', price: 200, slot: 'weapon', atk: 9 },
-  runeblade: { name: 'Rune Blade', price: 450, slot: 'weapon', atk: 15 },
-  padded: { name: 'Padded Tunic', price: 50, slot: 'armor', def: 3 },
-  chain: { name: 'Chain Vest', price: 180, slot: 'armor', def: 7 },
-  robe: { name: 'Mystic Mail', price: 420, slot: 'armor', def: 11 },
+  herb: { name: 'Herb', icon: 'herb', price: 10, use: 'heal', power: 40, target: 'ally', desc: 'Restores 40 HP to one ally.' },
+  tea: { name: 'Focus Tea', icon: 'tonic', price: 20, use: 'fp', power: 15, target: 'ally', desc: 'Restores 15 FP to one ally.' },
+  salts: { name: 'Smelling Salts', icon: 'plume', price: 60, use: 'revive', target: 'deadAlly', desc: 'Revives a fallen ally with half HP.' },
+  sunberry: { name: 'Sunberry', icon: 'berry', price: 80, use: 'healAll', power: 60, target: 'allAllies', desc: 'Restores 60 HP to every ally.' },
+  tinblade: { name: 'Tin Blade', icon: 'weapon', price: 70, slot: 'weapon', atk: 4 },
+  steelblade: { name: 'Steel Blade', icon: 'weapon', price: 200, slot: 'weapon', atk: 9 },
+  starsteel: { name: 'Starsteel Edge', icon: 'weapon', price: 450, slot: 'weapon', atk: 15 },
+  quilted: { name: 'Quilted Vest', icon: 'armor', price: 50, slot: 'armor', def: 3 },
+  chain: { name: 'Chain Vest', icon: 'armor', price: 180, slot: 'armor', def: 7 },
+  moonweave: { name: 'Moonweave Coat', icon: 'armor', price: 420, slot: 'armor', def: 11 },
 };
-const SHOP_LIST = ['herb', 'tonic', 'plume', 'shortsword', 'padded', 'longsword', 'chain', 'runeblade', 'robe'];
+const SHOP_LIST = ['herb', 'tea', 'salts', 'tinblade', 'quilted', 'steelblade', 'chain', 'starsteel', 'moonweave'];
 
 const ENEMIES = {
-  slime: { name: 'Dew Slime', shape: 'slime', color: '#5ac0e8', hp: 20, atk: 8, def: 3, agi: 5, xp: 8, gold: 4, weak: 'flame', resist: 'tide', h: 24 },
-  bat: { name: 'Duskwing', shape: 'bat', color: '#7a5aa8', hp: 16, atk: 10, def: 2, agi: 13, xp: 9, gold: 5, weak: 'terra', resist: 'gale', h: 36, float: true },
-  hopper: { name: 'Scythe Hopper', shape: 'bug', color: '#7ab040', hp: 30, atk: 12, def: 5, agi: 9, xp: 13, gold: 8, weak: 'flame', h: 30 },
-  mole: { name: 'Burrow Mole', shape: 'mole', color: '#a07850', hp: 36, atk: 13, def: 8, agi: 4, xp: 16, gold: 10, weak: 'tide', resist: 'terra', h: 28,
-    arts: [{ name: 'Mud Toss', elem: 'terra', power: 12, target: 'one', chance: 0.3 }] },
-  cavebat: { name: 'Gloom Bat', shape: 'bat', color: '#4a3a6a', hp: 34, atk: 17, def: 6, agi: 15, xp: 20, gold: 12, weak: 'terra', h: 36, float: true,
-    arts: [{ name: 'Screech', elem: 'gale', power: 10, target: 'all', chance: 0.2 }] },
-  golem: { name: 'Clay Golem', shape: 'golem', color: '#b0785a', hp: 80, atk: 21, def: 15, agi: 3, xp: 36, gold: 24, weak: 'tide', resist: 'terra', h: 46,
-    arts: [{ name: 'Rock Slam', elem: 'terra', power: 26, target: 'one', chance: 0.25 }] },
-  lantern: { name: 'Wraith Lantern', shape: 'lantern', color: '#ffcf60', hp: 46, atk: 15, def: 9, agi: 11, xp: 26, gold: 18, weak: 'tide', resist: 'flame', h: 42, float: true,
-    arts: [{ name: 'Wisp Fire', elem: 'flame', power: 14, target: 'all', chance: 0.35 }] },
-  gloomwarden: { name: 'Gloomwarden', shape: 'boss', color: '#3a2350', hp: 500, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'flame', resist: 'tide', h: 72, boss: true, twice: true,
-    arts: [{ name: 'Shadow Crush', elem: 'gloom', power: 34, target: 'one', chance: 0.3 }, { name: 'Umbral Wave', elem: 'gloom', power: 20, target: 'all', chance: 0.3 }] },
+  puddle: { name: 'Puddlejelly', shape: 'jelly', hp: 20, atk: 8, def: 3, agi: 5, xp: 8, gold: 4, weak: 'bloom', resist: 'ember' },
+  burrbun: { name: 'Burrbun', shape: 'bun', hp: 24, atk: 10, def: 4, agi: 9, xp: 10, gold: 6, weak: 'ember' },
+  wasp: { name: 'Thistle Wasp', shape: 'wasp', hp: 18, atk: 11, def: 2, agi: 14, xp: 10, gold: 6, weak: 'gale', float: true },
+  mudsnout: { name: 'Mudsnout', shape: 'mole', hp: 36, atk: 13, def: 8, agi: 4, xp: 16, gold: 10, weak: 'bloom', resist: 'gale',
+    arts: [{ name: 'Mud Toss', elem: 'bloom', power: 12, target: 'one', chance: 0.3 }] },
+  glowcap: { name: 'Glowcap', shape: 'glowcap', hp: 44, atk: 15, def: 8, agi: 8, xp: 24, gold: 16, weak: 'ember', resist: 'bloom',
+    arts: [{ name: 'Spore Puff', elem: 'bloom', power: 13, target: 'all', chance: 0.35 }] },
+  shellback: { name: 'Shellback', shape: 'shell', hp: 78, atk: 20, def: 15, agi: 3, xp: 34, gold: 22, weak: 'bloom', resist: 'gale',
+    arts: [{ name: 'Shell Slam', elem: 'hush', power: 26, target: 'one', chance: 0.25 }] },
+  hushmoth: { name: 'Hushmoth', shape: 'moth', hp: 34, atk: 16, def: 6, agi: 15, xp: 20, gold: 12, weak: 'gale', float: true,
+    arts: [{ name: 'Silent Dust', elem: 'hush', power: 10, target: 'all', chance: 0.25 }] },
+  queen: { name: 'Hushmoth Queen', shape: 'queen', hp: 520, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
+    arts: [{ name: 'Wingstorm', elem: 'hush', power: 20, target: 'all', chance: 0.3 }, { name: 'Hush Drain', elem: 'hush', power: 32, target: 'one', chance: 0.3, drain: true }] },
 };
-
 const ENCOUNTERS = {
-  field: [['slime'], ['slime', 'slime'], ['bat'], ['bat', 'slime'], ['hopper'], ['hopper', 'slime'], ['mole'], ['slime', 'slime', 'bat'], ['bat', 'bat']],
-  grotto: [['cavebat', 'cavebat'], ['golem'], ['lantern'], ['lantern', 'cavebat'], ['mole', 'cavebat'], ['golem', 'lantern'], ['cavebat', 'cavebat', 'cavebat'], ['lantern', 'lantern']],
+  field: [['puddle'], ['puddle', 'puddle'], ['burrbun'], ['wasp'], ['wasp', 'puddle'], ['burrbun', 'puddle'], ['mudsnout'], ['burrbun', 'burrbun'], ['wasp', 'wasp']],
+  grotto: [['hushmoth', 'hushmoth'], ['shellback'], ['glowcap'], ['glowcap', 'hushmoth'], ['mudsnout', 'hushmoth'], ['shellback', 'glowcap'], ['hushmoth', 'hushmoth', 'hushmoth'], ['glowcap', 'glowcap']],
 };
 
-// ---------- NPC looks ----------
-const LOOKS = {
-  elder: { skin: '#e8c09a', hair: '#e8e8e8', tunic: '#6a4a8a', pants: '#4a3a5a', accent: '#d0b060', style: 'long', beard: '#e8e8e8' },
-  guard: { skin: '#e0b08a', hair: '#5a3a20', tunic: '#8a8a9a', pants: '#4a4a5a', accent: '#c03030', style: 'hat' },
-  woman: { skin: '#f0c8a0', hair: '#a06030', tunic: '#c06080', pants: '#6a3050', accent: '#fff0c0', style: 'long' },
-  kid: { skin: '#f4cca4', hair: '#e0a030', tunic: '#e05050', pants: '#3a4a8a', accent: '#ffffff', style: 'spiky' },
-  oldman: { skin: '#e0b890', hair: '#c8c8c8', tunic: '#5a7a5a', pants: '#4a4030', accent: '#a08050', style: 'bald', beard: '#d8d8d8' },
-  innkeeper: { skin: '#e8b890', hair: '#303030', tunic: '#c08040', pants: '#5a3a20', accent: '#ffffff', style: 'short' },
-  shopkeeper: { skin: '#f0c49a', hair: '#704020', tunic: '#3060a0', pants: '#2a2a3a', accent: '#e0c040', style: 'hat' },
-  traveler: { skin: '#d8a070', hair: '#402818', tunic: '#806040', pants: '#4a3a2a', accent: '#a03020', style: 'hat' },
+// ---------- people (dialog speakers & NPC looks) ----------
+const PEOPLE = {
+  wren: { name: 'Wren', look: HEROES.wren.look },
+  bram: { name: 'Bram', look: HEROES.bram.look },
+  tamsin: { name: 'Tamsin', look: HEROES.tamsin.look },
+  gran: { name: 'Gran Hesper', look: { skin: '#ecc4a0', hair: '#e8e4ec', hairStyle: 'bun', top: '#7a5aa0', bottom: '#5a4a6a', apron: '#f0e8d8' } },
+  pell: { name: 'Pell', look: { skin: '#d8a47a', hair: '#6a4a2a', hairStyle: 'short', top: '#6a8a4a', bottom: '#4a3a2a', hat: '#c8a050', beard: '#6a4a2a' } },
+  rosa: { name: 'Rosa', look: { skin: '#f0c8a0', hair: '#b05a30', hairStyle: 'long', top: '#d06080', dress: '#c05070' } },
+  pip: { name: 'Pip', look: { skin: '#f4cca4', hair: '#e0a030', hairStyle: 'messy', top: '#4a7ad0', bottom: '#3a4a6a', build: 'small' } },
+  ivy: { name: 'Ivy', look: { skin: '#c89070', hair: '#2a2030', hairStyle: 'long', top: '#3a6a8a', dress: '#2a4a6a', glasses: true } },
+  marta: { name: 'Marta', look: { skin: '#e8b890', hair: '#7a3a2a', hairStyle: 'bun', top: '#c08040', bottom: '#5a3a20', apron: '#f4ecdc' } },
+  dorrit: { name: 'Dorrit', look: { skin: '#f0c49a', hair: '#5a5a6a', hairStyle: 'bald', top: '#3a6aa0', bottom: '#2a2a3a', beard: '#8a8a9a' } },
+  odo: { name: 'Odo', look: { skin: '#d8a070', hair: '#402818', hairStyle: 'short', top: '#806040', bottom: '#4a3a2a', hat: '#6a4a8a', cape: '#5a4a3a' } },
 };
 
-// ---------- Maps ----------
-// Tiles: . grass  f flowers  T tree  M cliff  ~ water  = path  | bridge  # cave wall  _ cave floor
-// H wall  R roof  D door  W wood floor  K counter  b bed  Y shelf  X exit  v cave mouth
-// B thornbush (Kindle)  O boulder (Shove)  P pit  p filled pit  o stepping stone  I ice (Chill)
-// C chest  c open chest  S sign  r rock  L beacon
+// ---------- maps ----------
+// . grass  , flowers  " tall grass (encounters)  = path  ~ water  % lily pad  o stepping stone  | bridge
+// T tree  t bush  M cliff  v cave mouth  R roof  H house wall  D door  F fence  b flower bed  l lamp
+// u barrel  x crate  w well  S sign  Q interior wall  W wood floor  g rug  K counter  Y shelf  e bed  k table  q plant
+// # cave wall  _ cave floor  z crystal  m mushrooms  r rock  P pit  p filled pit  O boulder  B bramble  C chest  c open chest
+// L the Rootwell spring  X exit
 const MAPS = {
   village: {
-    name: 'Brindlewood', ground: '.', music: 'village',
+    name: 'Mossbell Village', ground: '.', music: 'village', ambient: 'leaves', outdoor: true,
     rows: [
-      'TTTTTTTTTTTTTTTTTTTTTTTTTT',
-      'TT..f.......TT......f..TTT',
-      'T..RRRRR..........RRRRR..T',
-      'T..RRRRR....f.....RRRRR..T',
-      'T..HHDHH..........HHDHH..T',
-      'T....=..............=....T',
-      'T....================....T',
-      'T.f.........=............T',
-      'T...........=............T',
-      'T...........==============',
-      'T..RRRRR....=......~~~S..T',
-      'T..RRRRR....=......~~~...T',
-      'T..HHDHH....=.f....~~~...T',
-      'T....=......=............T',
-      'T.f..=============....f..T',
-      'T..f.........T.....f.....T',
-      'TT.....TT........TTT...TTT',
-      'TTTTTTTTTTTTTTTTTTTTTTTTTT',
+      'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+      'TTT.........TT..T.........TTTT',
+      'TT.RRRRR.FFF.......RRRRRR...TT',
+      'T..RRRRR.F,F....,..RRRRRR...TT',
+      'T.bHHDHHbFFF......bHHDHHHb..TT',
+      'T....=...............=.l....TT',
+      'T....=================.....,TT',
+      'T..,..l.......=...........t.TT',
+      'T.......~~~~.l=.w..,........TT',
+      'TT..,...~~~~~.=..........lS.TT',
+      'TT......~~~~..================',
+      'T.............=.............TT',
+      'T..RRRRR.,..t.=l.,........,.TT',
+      'T..RRRRR......=.....RRRRR...TT',
+      'T.bHHDHHu.....=.....RRRRRx..TT',
+      'T....=..xu....=....xHHHHHu..TT',
+      'T.,..==========.............TT',
+      'T..,........................TT',
+      'T.....,.....,.....,.....,...TT',
+      'TT..t..............t.......TTT',
+      'TTT.......TT.....T........T.TT',
+      'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     ],
     warps: [
-      { x: 5, y: 4, to: 'elder', tx: 4, ty: 6, dir: 'up' },
-      { x: 20, y: 4, to: 'inn', tx: 4, ty: 6, dir: 'up' },
-      { x: 5, y: 12, to: 'shop', tx: 4, ty: 6, dir: 'up' },
-      { x: 25, y: 9, to: 'field', tx: 1, ty: 11, dir: 'right' },
+      { x: 5, y: 4, to: 'gran', tx: 4, ty: 6, dir: 'up' },
+      { x: 21, y: 4, to: 'inn', tx: 4, ty: 6, dir: 'up' },
+      { x: 5, y: 14, to: 'shop', tx: 4, ty: 6, dir: 'up' },
+      { x: 29, y: 10, to: 'field', tx: 1, ty: 11, dir: 'right' },
     ],
-    signs: { '22,10': 'East: Windmere Fields.\nBeyond them, in the northern cliffs: Whisper Grotto.' },
-    wisps: [{ id: 'pebble', x: 24, y: 15 }],
+    signs: { '26,9': 'East: Windmere Fields.\nBeyond them, in the cliffs: Whisper Grotto.' },
+    trinkets: [{ id: 'foxbell', x: 27, y: 18 }],
     npcs: [
-      { id: 'guard1', x: 24, y: 9, look: 'guard', dir: 'left', cond: () => !state.flags.metElder,
-        talk: async () => { await say("Sorry, Kai. Elder Maren asked to see you two before anyone leaves the village. Her house is in the northwest.", 'Guard'); } },
-      { id: 'guard2', x: 24, y: 8, look: 'guard', dir: 'down', cond: () => state.flags.metElder,
+      { id: 'pell1', x: 28, y: 10, who: 'pell', dir: 'left', cond: () => !state.flags.metGran,
+        talk: async () => { await say("Morning, Wren! Your gran was asking after you. Best go see her before you wander off. Her cottage is up the path, northwest.", 'pell'); } },
+      { id: 'pell2', x: 27, y: 11, who: 'pell', dir: 'left', cond: () => !!state.flags.metGran,
         talk: async () => {
-          if (state.flags.bossDead) await say("The Beacon shines again! I can finally get some sleep on watch.", 'Guard');
-          else await say("Monsters lurk in the tall grass out there. If you get hurt, rest at the inn. And don't forget the shop!", 'Guard');
+          if (state.flags.bossDead) await say("The flowers are back! Never thought I'd be so happy to sneeze.", 'pell');
+          else await say("The fields are crawling with critters lately. They hide in the tall grass, so stick to the path if you'd rather not fight.", 'pell');
         } },
-      { id: 'woman', x: 17, y: 11, look: 'woman', wander: true,
+      { id: 'rosa', x: 12, y: 11, who: 'rosa', wander: true,
         talk: async () => {
-          if (state.flags.bossDead) await say("The pond glows again at night! Just like when I was a girl.", 'Villager');
-          else await say("The pond used to shimmer with light from the Beacon every night. Now it's just... dark.", 'Villager');
+          if (state.flags.bossDead) await say("Look at my roses! Redder than they've ever been!", 'rosa');
+          else await say("My roses went gray overnight. I keep watering them, but it's like the color just... drained away.", 'rosa');
         } },
-      { id: 'kid', x: 15, y: 15, look: 'kid', wander: true,
+      { id: 'pip', x: 18, y: 17, who: 'pip', wander: true,
         talk: async () => {
-          if (state.wisps.pebble) await say("You found the glowy critter! Lucky!", 'Pip');
-          else await say("I saw a glowing little critter hiding by the trees in the southeast corner! It hummed like a rock. Go look!", 'Pip');
+          if (state.trinkets.foxbell !== undefined) await say("You found the jingly bell! Does it make you faster? It makes ME faster just looking at it!", 'pip');
+          else await say("I heard jingling by the big trees in the southeast corner! Like a little bell! Go look, go look!", 'pip');
         } },
-      { id: 'oldman', x: 10, y: 7, look: 'oldman',
+      { id: 'ivy', x: 10, y: 7, who: 'ivy', dir: 'down',
         talk: async () => {
-          await say("Wisps are tiny spirits of the elements. Set on a hero, a Wisp lends its strength.", 'Old Tobin');
-          await say("In battle you can unleash a Wisp for a mighty effect! It needs a couple of turns to recover afterward, though.", 'Old Tobin');
-          await say("Use the Wisps page of the menu to choose who each Wisp travels with.", 'Old Tobin');
+          await say("When friends fight side by side, their hearts fall into rhythm. In battle you'll feel it as Harmony.", 'ivy');
+          await say("When the Harmony gauge is full, one of you can unleash a Burst. It's strong enough to turn any battle.", 'ivy');
+          await say("And keep an eye out for Trinkets. They're little charms with a bit of magic in them. Each of you can wear one; check the menu.", 'ivy');
         } },
     ],
     onEnter: async () => {
       if (!state.flags.intro) {
         state.flags.intro = true;
-        await say("Kai! There you are. Elder Maren sent for us. She said it's urgent!", 'Lyra');
-        await say("Her house is the one in the northwest, with the red roof. Let's hurry!", 'Lyra');
-        await say("(Move with the D-pad. Press A to talk and examine. Hold B to run.)");
+        await say("Wren! There you are. Your gran's been looking for you all morning.", 'bram');
+        await say("Something's wrong with the flowers. Even the bees won't leave their hives. Come on, her cottage is just up the path to the northwest!", 'bram');
+        await say("(Move with the D-pad, or tap where you want to go. Press A, or tap people and things, to interact.)");
       }
     },
   },
 
-  elder: {
-    name: "Elder's House", ground: 'W', music: 'village', interior: true,
-    rows: ['HHHHHHHHHH', 'HYYWWWWWbH', 'HWWWWWWWWH', 'HWWWWWWWWH', 'HWKKWWWWWH', 'HWWWWWWWWH', 'HWWWWWWWWH', 'HHHHXHHHHH'],
+  gran: {
+    name: "Gran's Cottage", ground: 'W', music: 'village', interior: true,
+    rows: ['QQQQQQQQQQ', 'QQQQQQQQQQ', 'QYYWWWWWeQ', 'QWWWggWWWQ', 'QqWkggWWWQ', 'QWWWggWWqQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
     warps: [{ x: 4, y: 7, to: 'village', tx: 5, ty: 5, dir: 'down' }],
-    npcs: [
-      { id: 'elder', x: 6, y: 2, look: 'elder', dir: 'down',
-        talk: async () => {
-          const E = 'Elder Maren';
-          if (!state.flags.metElder) {
-            await say("Ah, Kai, Lyra. Thank you for coming so quickly.", E);
-            await say("Three nights ago, the Dawnbeacon in Whisper Grotto went dark. For a hundred years its light has held back the Gloom.", E);
-            await say("Without it, monsters roam the Windmere Fields. Our farmers dare not leave the village.", E);
-            await say("You two are Attuned. Kai, Terra flows through you. You can Shove great boulders with a thought.", E);
-            await say("Lyra, your Flame can Kindle even the thorniest brambles into ash.", E);
-            await say("Please, journey northeast past the fields to the Grotto, and rekindle the Beacon.", E);
-            await say("Take this. It isn't much, but it should help you prepare.", E);
-            state.gold += 60; addItem('herb', 2); sfx('chest');
-            await say("Received 60 gold and 2 Herbs!");
-            await say("(Tip: press ✦ to use an Attunement power on whatever you're facing. Press ☰ for the menu, where you can also save.)");
-            state.flags.metElder = true; syncNpcs();
-          } else if (!state.flags.bossDead) {
-            await say("The Grotto lies northeast, past the fields. Rest at the inn if you are weary. May the light guide you.", E);
-          } else {
-            await say("The Beacon shines again! Brindlewood owes you everything, children.", E);
-          }
-        } },
-    ],
+    npcs: [{ id: 'gran', x: 6, y: 3, who: 'gran', dir: 'down', talk: async () => granScript() }],
   },
-
   inn: {
-    name: 'Mossy Kettle Inn', ground: 'W', music: 'village', interior: true,
-    rows: ['HHHHHHHHHH', 'HbWWYYWWbH', 'HWWWWWWWWH', 'HWWKKKKWWH', 'HWWWWWWWWH', 'HWWWWWWWWH', 'HWWWWWWWWH', 'HHHHXHHHHH'],
-    warps: [{ x: 4, y: 7, to: 'village', tx: 20, ty: 5, dir: 'down' }],
-    npcs: [{ id: 'inn', x: 4, y: 2, look: 'innkeeper', dir: 'down', talk: async () => innScript() }],
+    name: 'The Sleepy Kettle', ground: 'W', music: 'village', interior: true,
+    rows: ['QQQQQQQQQQ', 'QQQQQQQQQQ', 'QeWWWWWWeQ', 'QWWKKKKWWQ', 'QWWWggWWWQ', 'QqWWggWWqQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
+    warps: [{ x: 4, y: 7, to: 'village', tx: 21, ty: 5, dir: 'down' }],
+    npcs: [{ id: 'marta', x: 4, y: 2, who: 'marta', dir: 'down', talk: async () => innScript() }],
   },
-
   shop: {
     name: 'Tinker & Thyme', ground: 'W', music: 'village', interior: true,
-    rows: ['HHHHHHHHHH', 'HYYYYYYYYH', 'HWWWWWWWWH', 'HWWKKKKWWH', 'HWWWWWWWWH', 'HWWWWWWWWH', 'HWWWWWWWWH', 'HHHHXHHHHH'],
-    warps: [{ x: 4, y: 7, to: 'village', tx: 5, ty: 13, dir: 'down' }],
-    npcs: [{ id: 'shopkeep', x: 4, y: 2, look: 'shopkeeper', dir: 'down',
-      talk: async () => { await say("Welcome to Tinker & Thyme! Herbs, tonics, blades and armor. Have a look!", 'Shopkeeper'); await shopScript(); } }],
+    rows: ['QQQQQQQQQQ', 'QQQQQQQQQQ', 'QYYWWWWYYQ', 'QWWKKKKWWQ', 'QWWWggWWWQ', 'QuWWggWWxQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
+    warps: [{ x: 4, y: 7, to: 'village', tx: 5, ty: 15, dir: 'down' }],
+    npcs: [{ id: 'dorrit', x: 4, y: 2, who: 'dorrit', dir: 'down',
+      talk: async () => { await say("Welcome to Tinker & Thyme! Herbs, teas, blades and armor. Have a look!", 'dorrit'); await shopScript(); } }],
   },
 
   field: {
-    name: 'Windmere Fields', ground: '.', music: 'field', enc: 'field', bg: 'field',
+    name: 'Windmere Fields', ground: '.', music: 'field', enc: 'field', encTall: true, bg: 'field', ambient: 'petals', outdoor: true,
     rows: [
-      'MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM',
-      'MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM',
-      'MMMMMMMMMMMMMMMM~~MMMMMMMMvMMMMM',
-      'T.......T.......~~........=...TT',
-      'T...f...........~~........=..f.T',
-      'T..T............~~..T.....=..C.T',
-      'T.......T.......~~........=....T',
-      'T...............~~...T....=....T',
-      'T....T..........~~........=..T.T',
-      'T...............~~........=....T',
-      'T.S.............~~........=....T',
-      '================||===========..T',
-      'T...............~~.......S.....T',
-      'T.....T.........~~.............T',
-      'T...............~~.............T',
-      'T..TTTBTTT......~~.....TTTTBTT.T',
-      'T..T.....T......~~.....T.....T.T',
-      'T..T.....T......~~.....T.....T.T',
-      'T..T.C...T......~~.....T..C..T.T',
-      'T..T.....T......~~.....T.....T.T',
-      'T..TTTTTTT......~~.....TTTTTTT.T',
-      'TTTTTTTTTTTTTTTT~~TTTTTTTTTTTTTT',
+      'TMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMTT',
+      'TMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMTT',
+      'TMMMMMMMMMMMMMMM~~MMMMMMMMMvMMMMTT',
+      'TT.T....T.....,.~~.........=....TT',
+      'TT."""""""..T...~~r.""""...=...TTT',
+      'T.."""""""......~~..""""."""""..TT',
+      'T..""""""".r....~~.."""".""""".CTT',
+      'T.."""""""....T.~~.T""""."""""..TT',
+      'T...............~~..""""...=..T.TT',
+      'T...r..""""..T..~~....T....=....TT',
+      'T.S...."""".....~~..,......=..r.TT',
+      '=======""""=====||==========....TT',
+      'T......"""".....~~......T.S.....TT',
+      'T....T."""".,...~~."""""""..."""TT',
+      'T........."""""t~~."""""""..."""TT',
+      'T..TTTBTTT""""".~~."""""""..,"""TT',
+      'T..T.....T""""".~~."""""""..."""TT',
+      'T..T.....T""""".~~t"""""""..."""TT',
+      'T..T.C...T"""""t~~.....TTTBTTT""TT',
+      'T..T.....T""""".~~...T.T.....T""TT',
+      'T.TTTTTTTT......~~.....T...C.T""TT',
+      'T...........T...~~.T..,T.....T..TT',
+      'T.....,.......T.~~.....TTTTTTT..TT',
+      'TTTTTTTTTTTTTTTT~~TTTTTTTTTTTTTTTT',
     ],
     warps: [
-      { x: 0, y: 11, to: 'village', tx: 24, ty: 9, dir: 'left' },
-      { x: 26, y: 2, to: 'grotto', tx: 11, ty: 24, dir: 'up' },
+      { x: 0, y: 11, to: 'village', tx: 28, ty: 10, dir: 'left' },
+      { x: 27, y: 2, to: 'grotto', tx: 11, ty: 24, dir: 'up' },
     ],
     signs: {
-      '2,10': 'West: Brindlewood.\nNortheast: Whisper Grotto.',
-      '25,12': 'Whisper Grotto: straight north.\nBeware, the Gloom stirs within.',
+      '2,10': 'West: Mossbell Village.\nNortheast: Whisper Grotto.',
+      '26,12': 'Whisper Grotto: straight north.\nThe Rootwell spring rises within.',
     },
-    chests: { '29,5': { item: 'herb', n: 2 }, '5,18': { item: 'tonic', n: 2 }, '26,18': { item: 'plume', n: 1 } },
-    wisps: [{ id: 'cinder', x: 7, y: 17 }],
+    chests: { '31,6': { item: 'herb', n: 2 }, '5,18': { item: 'tea', n: 2 }, '27,20': { item: 'salts', n: 1 } },
+    trinkets: [{ id: 'thimble', x: 7, y: 17 }],
     npcs: [
-      { id: 'traveler', x: 19, y: 10, look: 'traveler', dir: 'left',
+      { id: 'odo', x: 21, y: 10, who: 'odo', dir: 'left',
         talk: async () => {
-          await say("This river used to freeze solid every winter. Folk say a Tide adept could freeze it at will.", 'Traveler');
-          await say("See those thorny thickets to the south? Something's glinting behind them. Too bad nobody can get through...", 'Traveler');
+          await say("The river's too wide to wade and too cold to swim. I hear the botanists at Larkspur grow lily pads big enough to walk on. Wouldn't that be something?", 'odo');
+          await say("Oh, and something shiny is hidden behind those thorny thickets down south. I'd need a torch to get through.", 'odo');
         } },
     ],
     onEnter: async () => {
       if (!state.flags.fieldIntro) {
         state.flags.fieldIntro = true;
-        await say("Windmere Fields... Watch the tall grass, Kai. Monsters could jump out anywhere.", 'Lyra');
-        await say("And see those thorny thickets? My Kindle could burn right through them. Just face one and press ✦.", 'Lyra');
+        await say("Windmere Fields. Careful in the tall grass, Wren. That's where the critters hide.", 'bram');
+        await say("And look, brambles over there. Your lantern could burn right through those.", 'wren');
+        await say("Just point me at 'em. (Walk up to brambles and press A. Bram will Kindle them.)", 'bram');
       }
     },
   },
 
   grotto: {
-    name: 'Whisper Grotto', ground: '_', music: 'cave', enc: 'grotto', bg: 'cave', dark: true,
+    name: 'Whisper Grotto', ground: '_', music: 'cave', enc: 'grotto', bg: 'cave', dark: true, ambient: 'motes',
     rows: [
       '########################',
-      '#######____L_____#######',
+      '#######z___L____z#######',
       '#######__________#######',
       '#######__________#######',
-      '#######__________#######',
+      '#######m_________#######',
       '#~~~~~~~~~~~~~~~~~~~~~~#',
       '#~~_~~~~~~~~~~~~~~~~~~~#',
       '#~~~~~~~~~~~~~~~~~~~~~~#',
-      '#______________________#',
+      '#z____________________z#',
       '#######__________#######',
       '#____#___________#######',
       '#____O____________O_P__#',
       '#____#___________#######',
-      '#######_________C#######',
+      '#######z________C#######',
       '###########_############',
       '###########_############',
       '###########P############',
       '###########_############',
       '###########O############',
-      '#####______________#####',
+      '#####z_____________#####',
       '####__C_____________####',
-      '####__r_____________####',
+      '####__r____________m####',
       '####________________####',
       '#####______________#####',
       '##########____##########',
       '###########X############',
     ],
-    warps: [{ x: 11, y: 25, to: 'field', tx: 26, ty: 3, dir: 'down' }],
+    warps: [{ x: 11, y: 25, to: 'field', tx: 27, ty: 3, dir: 'down' }],
     chests: { '6,20': { item: 'herb', n: 2 }, '16,13': { item: 'sunberry', n: 1 } },
-    wisps: [{ id: 'zephyr', x: 3, y: 6 }, { id: 'droplet', x: 22, y: 11 }],
+    trinkets: [{ id: 'owlquill', x: 3, y: 6 }, { id: 'mosslocket', x: 22, y: 11 }],
     npcs: [
-      { id: 'fen', x: 2, y: 11, look: 'hero:fen', dir: 'right', cond: () => !state.flags.fenJoined, talk: async () => fenScript() },
-      { id: 'boss', x: 11, y: 2, enemy: 'gloomwarden', dir: 'down', cond: () => !state.flags.bossDead,
-        talk: async () => bossScript() },
+      { id: 'tamsin', x: 2, y: 11, who: 'tamsin', dir: 'right', cond: () => !state.flags.tamsinJoined, talk: async () => tamsinScript() },
+      { id: 'queen', x: 11, y: 2, enemy: 'queen', dir: 'down', cond: () => !state.flags.bossDead, talk: async () => bossScript() },
     ],
     onEnter: async () => {
       if (!state.flags.grottoIntro) {
         state.flags.grottoIntro = true;
-        await say("It's so dark in here... The Beacon must be at the very top.", 'Lyra');
-        await say("Kai, that boulder up ahead is blocking the tunnel. Can you Shove it?", 'Lyra');
+        await say("It's so quiet down here. Usually you can hear the Rootwell humming from the entrance.", 'wren');
+        await say("There's a boulder blocking the tunnel up ahead. Give it a Gust, Wren!", 'bram');
       }
     },
     onStep: (x, y) => (!state.flags.bossDead && y <= 4 ? bossScript : null),
-    beacon: async () => {
-      if (!state.flags.bossDead) { await say('The crystal is cold and dark.'); return; }
-      if (state.flags.beaconLit) { await say('The Dawnbeacon blazes with warm, steady light.'); return; }
-      await say("This is it, the Dawnbeacon. Together, everyone. Pour your Attunement into the crystal!", 'Lyra');
-      sfx('magic'); state.flags.beaconLit = true;
-      UI.flash = 1; await sleep(900); sfx('level');
-      await say('The Dawnbeacon roars back to life!');
+    spring: async () => {
+      if (!state.flags.bossDead) { await say('The spring is still and gray. Not a ripple.'); return; }
+      if (state.flags.springSings) { await say('The Rootwell bubbles and hums, bright as morning.'); return; }
+      await say('Rootwell... please wake up.', 'wren');
+      await say('Wren cups her hands into the water. A single clear note rises, then another, and another...');
+      sfx('heal'); state.flags.springSings = true;
+      UI.flash = 1; UI.flashCol = '#c8fff0'; await sleep(900); sfx('level');
       await endingScene();
     },
   },
 };
+
+// ---------- story scripts ----------
+async function granScript() {
+  if (!state.flags.metGran) {
+    await say("Oh, Wren. And Bram, too. Come in, both of you.", 'gran');
+    await say("You've seen the flowers. Gray as ash, every one. In sixty years I've never known the Rootwell to fall silent.", 'gran');
+    await say("Something is wrong down in Whisper Grotto, where the spring rises. Someone needs to go and look.", 'gran');
+    await say("We'll go, Gran.", 'wren');
+    await say("I thought you might say that. Then take this. It's your mother's old gale gauntlet. One good gust from it will push a boulder like a pebble.", 'gran');
+    sfx('chest');
+    await say("Wren received the Gale Gauntlet! (Face a boulder and press A, or ✦, to Gust it.)");
+    await say("And I've got my forge lantern. Brambles, meet fire.", 'bram');
+    await say("Here's a little coin and some herbs for the road. The grotto is east, past Windmere Fields. Come home safe, you two.", 'gran');
+    state.gold += 60; addItem('herb', 2); sfx('chest');
+    await say('Received 60 coins and 2 Herbs!');
+    state.flags.metGran = true; syncNpcs(); goalChanged();
+  } else if (!state.flags.bossDead) {
+    await say("The grotto is east, past the fields. If you get hurt, Marta at the inn will look after you.", 'gran');
+  } else {
+    await say("Listen... can you hear it? The Rootwell is singing again. Oh, my brave ones.", 'gran');
+  }
+}
+async function tamsinScript() {
+  await say("Hello? Is someone there? Oh, thank goodness, light! And people!", 'tamsin', '???');
+  await say("I'm Tamsin, a botanist from Larkspur College. I came to take samples from the Rootwell, but a rockslide boxed me in.", 'tamsin');
+  await say("Strange gray moths have been swarming toward the spring for days. I think they're what silenced it.", 'tamsin');
+  await say("We're heading there now. Come with us?", 'wren');
+  await say("Gladly! And I can help: my lilypad seeds grow pads big enough to walk on. That underground river won't stop us!", 'tamsin');
+  const lv = Math.max(...state.party.map((m) => m.lv));
+  state.party.push(makeMember('tamsin', lv));
+  state.flags.tamsinJoined = true;
+  syncNpcs(); sfx('level'); goalChanged();
+  await say('Tamsin joined the party!');
+  await say('(Face the river and press A to plant lily pads across it.)');
+}
+async function bossScript() {
+  if (state.flags.bossDead) return;
+  P.path = []; P.dir = 'up';
+  await sleep(250);
+  await say('A low hum fills the chamber. Something enormous unfolds its wings over the spring...');
+  await say("A Hushmoth! But she's huge... She's drinking the spring's song!", 'tamsin');
+  await say("Then let's give her something louder.", 'bram');
+  const r = await fight(['queen'], { boss: true, bg: 'boss' });
+  if (r === 'lose') return;
+  state.flags.bossDead = true;
+  syncNpcs(); goalChanged();
+  await say('The Hushmoth Queen crumbles into silver-gray dust.');
+  await say("Look, there's a silver band on what's left of her leg. Someone tagged her...", 'tamsin');
+  await say("We can worry about that later. The spring!", 'wren');
+}
+function goalText() {
+  const f = state.flags;
+  if (!f.metGran) return "Visit Gran's cottage (northwest)";
+  if (!f.grottoIntro) return 'Go east through Windmere Fields to Whisper Grotto';
+  if (!f.tamsinJoined) return 'Explore Whisper Grotto';
+  if (!f.bossDead) return 'Cross the river and reach the Rootwell';
+  if (!f.springSings) return 'Wake the Rootwell spring';
+  const n = Object.keys(state.trinkets).length;
+  return n < 4 ? `Free roam: find all Trinkets (${n}/4)` : 'You found everything. Thanks for playing!';
+}
