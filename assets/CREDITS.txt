@@ -12,3 +12,8 @@ Battle monsters (assets/monsters) come from two free packs, used under their lic
   - Creature Collector 64x64 by dadddydarko: https://dadddydarko.itch.io/creature-collector-64x64-2d-various-creatures-with-different-themes
     (turtle, moth, squirrel, wasp, worm)
 Rebuild with: python3 tools/build_monsters.py <Pipoya "non shade" folder> <"Static Creatures" folder>
+
+Outdoor ground, paths, tall grass, bushes, big trees, rocks, signs and stone cliffs (assets/tiles/c_*.png)
+come from "Pixel Art Top Down - Basic" by Cainos: https://cainos.itch.io/pixel-art-top-down-basic
+(free for personal and commercial use, no redistribution as standalone assets).
+water_c.png is the Ninja Adventure lake recoloured to match. Rebuild with tools/build_cainos.py.

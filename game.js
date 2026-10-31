@@ -168,19 +168,26 @@ window.addEventListener('keyup', (e) => { const k = KEYMAP[e.key]; if (k) releas
 window.addEventListener('blur', () => { for (const k in held) release(k); });
 
 (function setupTouch() {
-  const dpad = document.getElementById('dpad');
-  let dDir = null, dId = null;
-  const setDir = (d) => { if (d === dDir) return; if (dDir) release(dDir); dDir = d; if (d) press(d); dpad.dataset.dir = d || ''; };
+  // virtual analog stick: the knob follows your thumb; direction snaps to the closest of 4 ways,
+  // and pushing it near the edge makes the party run
+  const stick = document.getElementById('stick'), knob = stick.querySelector('.knob');
+  let sDir = null, sId = null;
+  const setDir = (d) => { if (d === sDir) return; if (sDir) release(sDir); sDir = d; if (d) press(d); };
   const upd = (e) => {
-    const r = dpad.getBoundingClientRect();
-    const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-    if (Math.hypot(dx, dy) < r.width * 0.1) { setDir(null); return; }
+    const r = stick.getBoundingClientRect(), R = r.width / 2;
+    let dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + R);
+    const dist = Math.hypot(dx, dy), max = R * 0.62;
+    if (dist > max) { dx *= max / dist; dy *= max / dist; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    const mag = Math.min(1, dist / max);
+    stickRun = mag > 0.92;
+    if (mag < 0.28) { setDir(null); return; }
     setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
   };
-  dpad.addEventListener('pointerdown', (e) => { e.preventDefault(); try { dpad.setPointerCapture(e.pointerId); } catch (_) {} dId = e.pointerId; upd(e); });
-  dpad.addEventListener('pointermove', (e) => { if (e.pointerId === dId) upd(e); });
-  const end = (e) => { if (e.pointerId !== dId) return; dId = null; setDir(null); };
-  dpad.addEventListener('pointerup', end); dpad.addEventListener('pointercancel', end); dpad.addEventListener('lostpointercapture', end);
+  stick.addEventListener('pointerdown', (e) => { e.preventDefault(); audioInit(); try { stick.setPointerCapture(e.pointerId); } catch (_) {} sId = e.pointerId; stick.classList.add('active'); upd(e); });
+  stick.addEventListener('pointermove', (e) => { if (e.pointerId === sId) upd(e); });
+  const end = (e) => { if (e.pointerId !== sId) return; sId = null; stickRun = false; stick.classList.remove('active'); knob.style.transform = ''; setDir(null); };
+  stick.addEventListener('pointerup', end); stick.addEventListener('pointercancel', end); stick.addEventListener('lostpointercapture', end);
   document.querySelectorAll('.btn').forEach((b) => {
     const k = b.dataset.k;
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (_) {} b.classList.add('on'); press(k); });
@@ -303,7 +310,7 @@ function handleInput(k) {
     doMapAction(k);
   }
 }
-let pendingAction = null;
+let pendingAction = null, stickRun = false;
 function doMapAction(k) {
   if (k === 'a') interact();
   else if (k === 'p') usePowerKey();
@@ -458,7 +465,7 @@ SAME['%'] = SAME.o = SAME['|'] = SAME['~']; SAME.D = SAME.H;
 const SOLID = new Set('T~#HRBOPCcSFKbYLrMQtuxwlzmqk '.split(''));
 const PROPS = { T: 'tree', t: 'bush', O: 'boulder', B: 'bramble', C: 'chest', c: 'chestOpen', S: 'sign', z: 'crystal', m: 'mushroom', r: 'rock', u: 'barrel', x: 'crate', w: 'well', l: 'lamp', q: 'plant', L: 'spring', Y: 'shelf', k: 'table' };
 const PROP_DY = { L: 8 };
-const NO_SHADOW = new Set(['L', 'w', 'Y', 'q', 'l', 'k', 'u', 'x', 'S', 'C', 'c']);
+const NO_SHADOW = new Set(['L', 'w', 'Y', 'q', 'l', 'k', 'u', 'x', 'S', 'C', 'c', 'T', 't', 'O', 'r']);
 
 function loadMap(id) {
   const def = MAPS[id];
@@ -550,7 +557,7 @@ function updateMap(dt) {
     n.fx = n.x; n.fy = n.y; n.x = nx; n.y = ny; n.t = 0; n.moving = true;
   }
   if (P.moving) {
-    P.t += dt / (held.b ? 110 : 190); P.anim += dt;
+    P.t += dt / (held.b || stickRun ? 110 : 190); P.anim += dt;
     if (P.t < 1) return;
     P.t = 1; P.moving = false;
     onStep();
@@ -755,11 +762,12 @@ function renderMap() {
   const sprites = [];
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const c = cur.t[y][x], v = hash(x, y) % 8;
-    bx.drawImage(ART.drawTile(c, { v, mask: cur.mask[y][x], ground: gr, k: tileK(x, y, c) }), x * TS - cx, y * TS - cy);
+    bx.drawImage(ART.drawTile(c, { v, mask: cur.mask[y][x], ground: gr, k: tileK(x, y, c), bv: hash(x >> 1, y >> 1) % 16, q: (x & 1) | ((y & 1) << 1) }), x * TS - cx, y * TS - cy);
     const pn = PROPS[c];
     if (pn) sprites.push({ y: y * TS + 15, draw: () => {
-      const im = c === 'L' && lit ? ART.prop('springLit') : ART.prop(pn, c === 'T' ? v % 4 : v);
-      const sx = x * TS - cx + Math.round((16 - im.width) / 2), sy = y * TS - cy + 16 - im.height + (PROP_DY[c] || 0);
+      const big = c === 'T' && y === 0 && x % 5 === 2;
+      const im = c === 'L' && lit ? ART.prop('springLit') : c === 'T' ? ART.prop(big ? 'tree' : 'hedge', big ? hash(x, 9) : v) : ART.prop(pn, v);
+      const sx = x * TS - cx + Math.round((16 - im.width) / 2), sy = y * TS - cy + 16 - im.height + (PROP_DY[c] || 0) + (c === 'T' && !big ? 3 : 0);
       if (!NO_SHADOW.has(c)) bshadow(x * TS - cx + 8, y * TS - cy + 14, c === 'T' ? 9 : 6);
       bx.drawImage(im, sx, sy);
     } });
@@ -1238,10 +1246,11 @@ function battleBg(kind) {
   const cave = kind !== 'field';
   for (let y = 0; y < H; y += 16) for (let x = 0; x < W; x += 16) {
     const v = hash(x / 16 + 3, y / 16 + 7) % 8, fl = hash(x / 16 + 11, y / 16 + 5) % 13 === 0;
-    g.drawImage(ART.drawTile(cave ? '_' : fl && y > hz + 20 ? ',' : '.', { v, ground: cave ? '_' : '.' }), x, y);
+    g.drawImage(ART.drawTile(cave ? '_' : fl && y > hz + 20 ? ',' : '.', { v, ground: cave ? '_' : '.', bv: hash(x >> 5, y >> 5) % 16, q: ((x >> 4) & 1) | (((y >> 4) & 1) << 1) }), x, y);
   }
   if (!cave) {
-    for (let row = Math.floor((hz - 8) / 16); row >= -2; row--) for (let x = -24 + ((row + 8) % 2) * 12; x < W + 8; x += 26) g.drawImage(ART.prop('tree', hash(x, row) % 3), x, row * 16 - 4);
+    for (let i = 0; i < 4; i++) { const t = ART.prop('tree', i); g.drawImage(t, i * 80 - 30, hz - t.height + 30); }
+    for (let row = 0; row < 3; row++) for (let x = -10 + (row % 2) * 12; x < W + 8; x += 22) { const hd = ART.prop('hedge', hash(x, row)); g.drawImage(hd, x, hz - 14 + row * 10); }
     for (let i = 0; i < 5; i++) g.drawImage(ART.prop('bush', i), (i * 61 + 14) % (W - 16), hz + 30 + ((i * 37) % 40));
     const fg = g.createLinearGradient(0, 0, 0, hz + 10); fg.addColorStop(0, 'rgba(12,20,16,0.82)'); fg.addColorStop(1, 'rgba(12,20,16,0)'); g.fillStyle = fg; g.fillRect(0, 0, W, hz + 10);
   } else {
@@ -1610,7 +1619,7 @@ function sceneBackdrop(dim) {
       const ch = m[y][x], base = ch === '%' ? '~' : ch;
       const mask = (same(x, y - 1, base) ? 1 : 0) | (same(x + 1, y, base) ? 2 : 0) | (same(x, y + 1, base) ? 4 : 0) | (same(x - 1, y, base) ? 8 : 0);
       const v = hash(x, y) % 8, fl = ch === '.' && hash(x + 5, y + 2) % 9 === 0;
-      g.drawImage(ART.drawTile(fl ? ',' : ch, { v, mask, ground: '.' }), x * 16, y * 16);
+      g.drawImage(ART.drawTile(fl ? ',' : ch, { v, mask, ground: '.', bv: hash(x >> 1, y >> 1) % 16, q: (x & 1) | ((y & 1) << 1) }), x * 16, y * 16);
     }
     const props = [];
     for (let y = -1; y < py - 6; y++) for (let x = -1 + (y % 2); x < cols + 1; x += 2) props.push([ART.prop('tree', hash(x, y) % 3), x * 16 - 8 + (y % 2) * 4, y * 14 - 8]);
