@@ -75,17 +75,17 @@ const ENEMIES = {
   puddle: { name: 'Puddlejelly', shape: 'slime', hp: 20, atk: 8, def: 3, agi: 5, xp: 8, gold: 4, weak: 'bloom', resist: 'ember' },
   burrbun: { name: 'Nutsnatcher', shape: 'squirrel', hp: 24, atk: 10, def: 4, agi: 9, xp: 10, gold: 6, weak: 'ember' },
   wasp: { name: 'Thistle Wasp', shape: 'wasp', hp: 18, atk: 11, def: 2, agi: 14, xp: 10, gold: 6, weak: 'gale', float: true },
-  mudsnout: { name: 'Mudworm', shape: 'worm', hp: 36, atk: 13, def: 8, agi: 4, xp: 16, gold: 10, weak: 'bloom', resist: 'gale',
+  mudsnout: { name: 'Mud Adder', shape: 'worm', hp: 36, atk: 13, def: 8, agi: 4, xp: 16, gold: 10, weak: 'bloom', resist: 'gale',
     arts: [{ name: 'Mud Toss', elem: 'bloom', power: 12, target: 'one', chance: 0.3 }] },
-  glowcap: { name: 'Glowcap', shape: 'mushroom', hp: 44, atk: 15, def: 8, agi: 8, xp: 24, gold: 16, weak: 'ember', resist: 'bloom',
+  glowcap: { name: 'Glowtoad', shape: 'mushroom', hp: 44, atk: 15, def: 8, agi: 8, xp: 24, gold: 16, weak: 'ember', resist: 'bloom',
     arts: [{ name: 'Spore Puff', elem: 'bloom', power: 13, target: 'all', chance: 0.35 }] },
-  shellback: { name: 'Shellback', shape: 'turtle', hp: 78, atk: 20, def: 15, agi: 3, xp: 34, gold: 22, weak: 'bloom', resist: 'gale',
-    arts: [{ name: 'Shell Slam', elem: 'hush', power: 26, target: 'one', chance: 0.25 }] },
-  hushmoth: { name: 'Hushmoth', shape: 'moth', hp: 34, atk: 16, def: 6, agi: 15, xp: 20, gold: 12, weak: 'gale', float: true,
-    arts: [{ name: 'Silent Dust', elem: 'hush', power: 10, target: 'all', chance: 0.25 }] },
-  hushling: { name: 'Hushling', shape: 'ghost', hp: 38, atk: 17, def: 7, agi: 12, xp: 24, gold: 14, weak: 'ember', resist: 'bloom', float: true,
+  shellback: { name: 'Cave Creeper', shape: 'turtle', hp: 78, atk: 20, def: 15, agi: 3, xp: 34, gold: 22, weak: 'bloom', resist: 'gale',
+    arts: [{ name: 'Venom Bite', elem: 'hush', power: 26, target: 'one', chance: 0.25 }] },
+  hushmoth: { name: 'Hushbat', shape: 'moth', hp: 34, atk: 16, def: 6, agi: 15, xp: 20, gold: 12, weak: 'gale', float: true,
+    arts: [{ name: 'Silent Shriek', elem: 'hush', power: 10, target: 'all', chance: 0.25 }] },
+  hushling: { name: 'Hushbones', shape: 'ghost', hp: 38, atk: 17, def: 7, agi: 12, xp: 24, gold: 14, weak: 'ember', resist: 'bloom', float: true,
     arts: [{ name: 'Chill Whisper', elem: 'hush', power: 14, target: 'one', chance: 0.3 }] },
-  queen: { name: 'Hush Wraith', shape: 'wraith', hp: 520, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
+  queen: { name: 'Hush Wyrm', shape: 'wraith', hp: 520, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
     arts: [{ name: 'Mournful Wail', elem: 'hush', power: 20, target: 'all', chance: 0.3 }, { name: 'Hush Drain', elem: 'hush', power: 32, target: 'one', chance: 0.3, drain: true }] },
 };
 const ENCOUNTERS = {
@@ -345,7 +345,7 @@ async function granScript() {
 async function tamsinScript() {
   await say("Hello? Is someone there? Oh, thank goodness, light! And people!", 'tamsin', '???');
   await say("I'm Tamsin, a botanist from Larkspur College. I came to take samples from the Rootwell, but a rockslide boxed me in.", 'tamsin');
-  await say("Strange gray moths have been swarming toward the spring for days, and the air down here has gone so cold. Something is feeding on the spring's song.", 'tamsin');
+  await say("Strange gray bats have been swarming toward the spring for days, and the air down here has gone so cold. Something is feeding on the spring's song.", 'tamsin');
   await say("We're heading there now. Come with us?", 'wren');
   await say("Gladly! And I can help: my lilypad seeds grow pads big enough to walk on. That underground river won't stop us!", 'tamsin');
   const lv = Math.max(...state.party.map((m) => m.lv));
@@ -360,13 +360,13 @@ async function bossScript() {
   P.path = []; P.dir = 'up';
   await sleep(250);
   await say('A cold mist gathers over the spring, and slowly takes shape...');
-  await say("A Hush Wraith! That's what the moths were drawn to. It's drinking the spring's song!", 'tamsin');
+  await say("A Hush Wyrm! That's what the bats were drawn to. It's drinking the spring's song!", 'tamsin');
   await say("Then let's give her something louder.", 'bram');
   const r = await fight(['queen'], { boss: true, bg: 'boss' });
   if (r === 'lose') return;
   state.flags.bossDead = true;
   syncNpcs(); goalChanged();
-  await say('The Hush Wraith unravels into thin gray mist.');
+  await say('The Hush Wyrm unravels into thin gray mist.');
   await say("Look, a silver band, lying right where it vanished. Someone bound that creature here...", 'tamsin');
   await say("We can worry about that later. The spring!", 'wren');
 }

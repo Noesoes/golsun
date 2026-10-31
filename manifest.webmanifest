@@ -1,7 +1,7 @@
 {
   "name": "Rootwell",
   "short_name": "Rootwell",
-  "description": "A cozy pixel-art adventure RPG. Explore Mossbell Vale, solve puzzles with your tools, and wake the singing spring.",
+  "description": "A cozy 3D adventure RPG. Explore Mossbell Vale, solve puzzles with your tools, and wake the singing spring.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",

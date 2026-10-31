@@ -65,7 +65,7 @@ function instances(parent, key, size, mode, items, opt = {}) {
   t.traverse((o) => { if (o.isMesh) parts.push(o); });
   for (const m of parts) {
     let mat = m.material;
-    if (opt.tint) { mat = mat.clone(); mat.color.multiply(new THREE.Color(opt.tint)); }
+    if (opt.tint != null) { mat = mat.clone(); mat.color.multiply(new THREE.Color(opt.tint)); }
     if (opt.emissive) { mat = mat.clone(); mat.emissive = new THREE.Color(opt.emissive); mat.emissiveIntensity = opt.ei || 0.6; }
     const im = new THREE.InstancedMesh(m.geometry, mat, items.length);
     items.forEach((it, i) => {
@@ -134,7 +134,7 @@ let water = null, falls = [];
 function init(canvas) {
   glCanvas = canvas;
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -207,10 +207,10 @@ function buildWalls(m, def) {
     const amp = interior ? 0 : 0.35, xa = interior ? 0 : 0.12;
     const corner = (cx, cy) => [cx + jit(cx + 50, cy, xa), Hh + jit(cx, cy, amp), cy + jit(cx, cy + 50, xa)];
     const tl = corner(x, y), tr = corner(x + 1, y), bl = corner(x, y + 1), br = corner(x + 1, y + 1);
-    const topC = cave ? [0.12, 0.1, 0.15] : interior ? [0.36, 0.24, 0.16] : (col.setHex(hash(x, y) < 0.5 ? 0x5e9a40 : 0x6aa646), [col.r, col.g, col.b]);
+    const topC = cave ? [0.2, 0.17, 0.24] : interior ? [0.36, 0.24, 0.16] : (col.setHex(hash(x, y) < 0.5 ? 0x5e9a40 : 0x6aa646), [col.r, col.g, col.b]);
     quad(tl, tr, br, bl, topC, topC);
-    const sideTop = cave ? [0.36, 0.32, 0.4] : interior ? [0.93, 0.88, 0.76] : [0.62, 0.52, 0.4];
-    const sideBot = cave ? [0.16, 0.14, 0.2] : interior ? [0.55, 0.38, 0.24] : [0.38, 0.3, 0.24];
+    const sideTop = cave ? [0.55, 0.48, 0.6] : interior ? [0.93, 0.88, 0.76] : [0.62, 0.52, 0.4];
+    const sideBot = cave ? [0.26, 0.22, 0.3] : interior ? [0.55, 0.38, 0.24] : [0.38, 0.3, 0.24];
     const down = (p) => [p[0], -0.6, p[2]];
     if (!isWall(x, y + 1)) quad(bl, br, down(br), down(bl), sideTop, sideBot);
     if (!isWall(x, y - 1)) quad(tr, tl, down(tl), down(tr), sideTop, sideBot);
@@ -282,19 +282,19 @@ function buildMap(m, st) {
     water.material.map = TEX.water.clone(); water.material.map.repeat.set(m.w / 3, m.h / 3); water.material.map.needsUpdate = true;
     water.userData.own = true; water.receiveShadow = true; world.add(water);
   }
-  const L = {}; const add = (k, it) => (L[k] = L[k] || []).push(it);
+  const L = {}; const add = (k, it) => { const ck = k + '|' + Math.floor(it.x / 8) + ',' + Math.floor(it.z / 8); (L[ck] = L[ck] || []).push(it); };
   const glows = [];
   for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
     const c = m.t[y][x], cx = x + 0.5, cz = y + 0.5, h = hash(x, y), h2 = hash(y + 17, x + 3), r = h2 * TAU;
     if (c === 'T') {
       const deep = [[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => { const t = m.t[y + dy] && m.t[y + dy][x + dx]; return !t || t === 'T'; });
-      if (deep && (x + y) % 2) continue;
-      const k = h < 0.62 ? 'nature/CommonTree_' + (1 + ((h * 100) | 0) % 5) : 'nature/Pine_' + (1 + ((h * 100) | 0) % 3);
-      add(k, { x: cx + (h2 - 0.5) * 0.4, z: cz + (h - 0.5) * 0.4, r, s: (deep ? 1.35 : 1) * (0.85 + h2 * 0.3) });
+      if (deep && (x + 2 * y) % 3) continue;
+      const k = h < 0.5 ? ['nature/CommonTree_3', 'nature/CommonTree_2', 'nature/CommonTree_4'][((h * 100) | 0) % 3] : 'nature/Pine_' + (1 + ((h * 100) | 0) % 3);
+      add(k, { x: cx + (h2 - 0.5) * 0.4, z: cz + (h - 0.5) * 0.4, r, s: (deep ? 1.6 : 1) * (0.85 + h2 * 0.3) });
     } else if (c === 't') add('nature/Bush_Common_Flowers', { x: cx, z: cz, r, s: 1.0 + h * 0.3 });
     else if (c === 'b') { add('nature/Flower_3_Group', { x: cx - 0.2, z: cz, r, s: 1.1 }); add('nature/Flower_4_Group', { x: cx + 0.2, z: cz + 0.15, r, s: 1.1 }); add('nature/Grass_Common_Short', { x: cx, z: cz - 0.2, r, s: 1 }); }
-    else if (c === ',') { add('nature/Flower_' + (h < 0.5 ? 3 : 4) + '_Group', { x: cx - 0.2, z: cz - 0.1, r, s: 1 }); add('nature/Flower_' + (h < 0.5 ? 4 : 3) + '_Group', { x: cx + 0.22, z: cz + 0.2, r: r + 2, s: 0.8 }); }
-    else if (c === '"') for (let i = 0; i < 5; i++) { const a = hash(x * 5 + i, y * 3 - i); add(i % 2 ? 'nature/Grass_Wispy_Tall' : 'nature/Grass_Common_Tall', { x: cx + (a - 0.5) * 0.85, z: cz + (hash(i, x + y) - 0.5) * 0.85, r: a * TAU, s: 0.8 + a * 0.5 }); }
+    else if (c === ',') { add('nature/Flower_3_Group', { x: cx - 0.2, z: cz - 0.1, r, s: 1 }); if (h < 0.4) add('nature/Flower_4_Group', { x: cx + 0.22, z: cz + 0.2, r: r + 2, s: 0.8 }); }
+    else if (c === '"') for (let i = 0; i < 4; i++) { const a = hash(x * 5 + i, y * 3 - i); add(i === 0 ? 'nature/Grass_Wispy_Tall' : 'nature/Grass_Common_Tall', { x: cx + (a - 0.5) * 0.85, z: cz + (hash(i, x + y) - 0.5) * 0.85, r: a * TAU, s: 0.8 + a * 0.5 }); }
     else if (c === 'r') add('nature/Rock_Medium_2', { x: cx, z: cz, r, s: 0.9 + h * 0.3 });
     else if (c === 'F') add('bld/fence_wood_straight', { x: cx, z: cz, r: (m.t[y][x - 1] === 'F' || m.t[y][x + 1] === 'F') ? Math.PI / 2 : 0, s: 1 });
     else if (c === 'u') add(interior ? 'props/Barrel' : 'props/Barrel_Apples', { x: cx, z: cz, r, s: 1 });
@@ -329,7 +329,12 @@ function buildMap(m, st) {
       else if (h < 0.58) add('nature/Mushroom_Common', { x: cx, z: cz, r, s: 1 });
       else if (h < 0.62) add('nature/Fern_1', { x: cx, z: cz, r, s: 1 });
     }
-    if (cave && c === '_' && h < 0.08) add('nature/Pebble_Round_' + (h2 < 0.5 ? 1 : 3), { x: cx, z: cz, r, s: 1 });
+    if (cave && c === '#') {
+      const edge = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dy]) => { const t = m.t[y + dy] && m.t[y + dy][x + dx]; return t && t !== '#'; });
+      if (edge) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + edge[0] * 0.3, y: -0.3, z: cz + edge[1] * 0.3, r, s: 2.4 + h2 * 1.2 });
+      else if (h < 0.25) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx, y: 2.0, z: cz, r, s: 1.8 });
+    }
+    if (cave && c === '_' && h < 0.14) add('nature/Pebble_Round_' + (h2 < 0.5 ? 1 : 3), { x: cx, z: cz, r, s: 1 });
     if (outdoor && c === 'M') {
       const front = m.t[y + 1] && m.t[y + 1][x] !== 'M' && m.t[y + 1][x] !== 'v';
       if (front && h < 0.35) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx, y: 0, z: cz + 0.45, r, s: 0.9 });
@@ -342,14 +347,14 @@ function buildMap(m, st) {
     Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.75, 'h'], Barrel_Apples: [0.75, 'h'], Crate_Wooden: [0.6, 'h'], Plant_7: [0.8, 'h'],
     Bookcase_2: [1.9, 'h'], Table_Large: [1.1, 'w'], Stool: [0.45, 'h'], Bed_Twin1: [1.0, 'w'], Workbench: [1.0, 'w'] };
   const sizeOf = (k) => { const n = k.split('/')[1]; for (const [p, v] of Object.entries(SIZES)) if (n === p || n.startsWith(p + '_') || n.startsWith(p)) return v; return [1, 'h']; };
-  for (const [k, items] of Object.entries(L)) { const [sz, mode] = sizeOf(k); instances(world, k, sz, mode, items, { cast: !k.includes('Grass') && !k.includes('Clover') && !k.includes('Pebble') && !k.includes('Flower') }); }
+  for (const [ck, items] of Object.entries(L)) { const k = ck.split('|')[0]; const [sz, mode] = sizeOf(k); const caveRock = cave && k.includes('Rock_Medium'); instances(world, k, sz, mode, items, { tint: caveRock ? 0x8a7aa8 : null, cast: !k.includes('Grass') && !k.includes('Clover') && !k.includes('Pebble') && !k.includes('Flower') }); }
   for (const hs of def.houses || []) {
     const o = building(hs.kind, hs.w, hs.h); o.position.set(hs.x + hs.w / 2, 0, hs.y + hs.h / 2 + 0.1); world.add(o);
   }
   // atmosphere
   if (outdoor) { scene.background = new THREE.Color(0xa8d8f0); scene.fog = new THREE.Fog(0xa8d8f0, 20, 42); hemi.intensity = 1.25; sun.intensity = 2.4; hemi.color.set(0xd8ecff); hemi.groundColor.set(0x5a6a3a); }
   else if (interior) { scene.background = new THREE.Color(0x1a1410); scene.fog = null; hemi.intensity = 1.1; sun.intensity = 1.4; hemi.color.set(0xfff0d8); hemi.groundColor.set(0x6a4a30); }
-  else { scene.background = new THREE.Color(0x07050c); scene.fog = new THREE.Fog(0x07050c, 9, 22); }
+  else { scene.background = new THREE.Color(0x07050c); scene.fog = new THREE.Fog(0x07050c, 14, 30); }
   mapInfo = { id: m.id, def, w: m.w, h: m.h, glows, outdoor, cave, interior };
   setCaveLight(st);
   rebuildDynamic(m, st);
@@ -357,8 +362,8 @@ function buildMap(m, st) {
 function setCaveLight(st) {
   if (!mapInfo || !mapInfo.cave) { playerLight.intensity = 0; glowLights.forEach((l) => (l.intensity = 0)); return; }
   const lit = st && st.flags && st.flags.springSings;
-  hemi.color.set(lit ? 0x9fb8ff : 0x6a5a9a); hemi.groundColor.set(0x1a1020); hemi.intensity = lit ? 0.9 : 0.28; sun.intensity = lit ? 0.6 : 0.08;
-  playerLight.intensity = lit ? 4 : 14;
+  hemi.color.set(lit ? 0xa8c0ff : 0x8a7ac8); hemi.groundColor.set(0x2a2030); hemi.intensity = lit ? 1.1 : 0.8; sun.intensity = lit ? 0.9 : 0.45;
+  playerLight.intensity = lit ? 6 : 22; playerLight.distance = 11;
 }
 const lastTiles = new Map();
 function rebuildDynamic(m, st) {
@@ -404,7 +409,7 @@ const CAST = {
 function makeActor(model, tint, scale = 1) {
   const src = G['chars/' + model].scene, obj = skClone(src);
   const wrap = new THREE.Group(); wrap.add(obj);
-  obj.scale.setScalar(0.46 * scale);
+  obj.scale.setScalar(0.6 * scale);
   if (tint) obj.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.multiply(new THREE.Color(tint)); } });
   obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
   const mixer = new THREE.AnimationMixer(obj), actions = {};
@@ -432,7 +437,7 @@ function monsterObj(shape, height) {
   const src = G['mon/' + shape].scene, obj = skClone(src), wrap = new THREE.Group(), inner = new THREE.Group();
   inner.add(obj); wrap.add(inner); obj.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(obj), sz = b.getSize(new THREE.Vector3());
-  const s = height / sz.y; obj.scale.multiplyScalar(s);
+  const s = height / Math.max(sz.y, Math.max(sz.x, sz.z) * 0.55); obj.scale.multiplyScalar(s);
   obj.position.set(-(b.min.x + b.max.x) / 2 * s, -b.min.y * s, -(b.min.z + b.max.z) / 2 * s);
   obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; o.material = o.material.clone(); o.userData.baseEm = o.material.emissive ? o.material.emissive.clone() : null; } });
   const mixer = new THREE.AnimationMixer(obj), anims = G['mon/' + shape].animations, actions = {};
@@ -505,17 +510,17 @@ function syncMap(dt, S) {
   // camera
   const interior = mapInfo.interior;
   const tx = interior ? mapInfo.w / 2 : px, tz = interior ? mapInfo.h / 2 + 0.6 : pz;
-  const halfW = 4.2, halfTop = 3.5, halfBot = 4.5;
+  const halfW = 4.2, halfTop = 4.0, halfBot = 4.6;
   const cx = interior ? tx : Math.max(halfW + 1, Math.min(mapInfo.w - halfW - 1, tx));
   const cz = interior ? tz : Math.max(halfTop + 1, Math.min(mapInfo.h - halfBot, tz));
   const goal = new THREE.Vector3(cx, 0, cz);
   if (!camInit) { camTarget.copy(goal); camInit = true; } else camTarget.lerp(goal, Math.min(1, dt / 160));
-  const dist = interior ? 8.5 : 12.5;
-  camera.position.set(camTarget.x, camTarget.y + dist * 0.82, camTarget.z + dist * 0.62);
-  camera.lookAt(camTarget.x, 0, camTarget.z - 0.3);
+  const dist = interior ? 9.5 : 13.5;
+  camera.position.set(camTarget.x, camTarget.y + dist * 0.76, camTarget.z + dist * 0.66);
+  camera.lookAt(camTarget.x, 0, camTarget.z - 0.6);
   sun.position.set(camTarget.x - 6, 14, camTarget.z + 5); sun.target.position.copy(camTarget);
   // lights in caves / interiors
-  playerLight.position.set(px, 1.6, pz + 0.3);
+  playerLight.position.set(px, 3.2, pz + 1.6);
   const near = (mapInfo.glows || []).filter((g) => !g.trinket || !(g.trinket in state.trinkets)).map((g) => ({ g, d: (g.x - px) ** 2 + (g.z - pz) ** 2 })).sort((a, b) => a.d - b.d);
   glowLights.forEach((l, i) => {
     const n = near[i];
@@ -529,13 +534,14 @@ const battleScene = new THREE.Scene();
 const battleCam = new THREE.PerspectiveCamera(36, 0.8, 0.1, 100);
 battleCam.position.set(0.6, 4.3, 10.5); battleCam.lookAt(0.6, 0.8, 0);
 const bHemi = new THREE.HemisphereLight(0xd8ecff, 0x5a6a3a, 1.2), bSun = new THREE.DirectionalLight(0xfff0d8, 2.4), bGlow = new THREE.PointLight(0x7affe0, 0, 12, 1.5);
-bSun.position.set(-5, 10, 6); bSun.castShadow = true; bSun.shadow.mapSize.set(1024, 1024); Object.assign(bSun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 });
+bSun.position.set(-3, 10, 9); bSun.castShadow = true; bSun.shadow.mapSize.set(1024, 1024); Object.assign(bSun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 });
 battleScene.add(bHemi, bSun, bGlow);
 let arena = null, arenaKind = '', bModels = [];
 const ENEMY_MODEL = { slime: 'Slime', squirrel: 'Rat', wasp: 'Wasp', worm: 'Snake', mushroom: 'Frog', turtle: 'Spider', moth: 'Bat', ghost: 'Skeleton', wraith: 'Dragon' };
-const ENEMY_H = { Slime: 1.0, Rat: 0.9, Wasp: 1.0, Snake: 1.25, Frog: 0.95, Spider: 0.95, Bat: 1.3, Skeleton: 1.7, Dragon: 3.2 };
+const ENEMY_H = { Slime: 0.75, Rat: 0.9, Wasp: 0.85, Snake: 1.25, Frog: 0.95, Spider: 0.95, Bat: 1.3, Skeleton: 1.7, Dragon: 2.6 };
 const ENEMY_TINT = { wraith: 0x9a7ad8, ghost: 0xd8d0ff, moth: 0xc8b0ff };
-function tintMonster(mo, shape) { const t = ENEMY_TINT[shape]; if (!t) return; mo.obj.traverse((o) => { if (o.isMesh) o.material.color.multiply(new THREE.Color(t)); }); }
+const ENEMY_GLOW = { wraith: 0x3a2a5a, ghost: 0x2a2440, moth: 0x2a2040 };
+function tintMonster(mo, shape) { const t = ENEMY_TINT[shape], g = ENEMY_GLOW[shape]; mo.obj.traverse((o) => { if (!o.isMesh) return; if (t) o.material.color.multiply(new THREE.Color(t)); if (g && o.material.emissive) { o.material.emissive.set(g); o.userData.baseEm = o.material.emissive.clone(); } }); }
 function buildArena(kind) {
   if (arena && arenaKind === kind) return;
   dispose(arena); arena = new THREE.Group(); battleScene.add(arena); arenaKind = kind;
@@ -556,13 +562,13 @@ function buildArena(kind) {
     instances(arena, 'nature/Flower_4_Group', 0.5, 'h', flowers, { cast: false });
     instances(arena, 'nature/Bush_Common_Flowers', 1.0, 'w', [{ x: -5.5, z: 1 }, { x: 6, z: 2.4 }, { x: -2, z: -4.5 }], {});
     battleScene.background = new THREE.Color(0xa8d8f0); battleScene.fog = new THREE.Fog(0xa8d8f0, 14, 32);
-    bHemi.intensity = 1.2; bSun.intensity = 2.4; bGlow.intensity = 0;
+    bHemi.color.set(0xd8ecff); bHemi.groundColor.set(0x5a6a3a); bHemi.intensity = 1.2; bSun.color.set(0xfff0d8); bSun.intensity = 2.4; bGlow.intensity = 0;
   } else {
     instances(arena, 'nature/Rock_Medium_1', 2.4, 'w', rocks.filter((_, i) => i % 2), { tint: 0x8a80a0 });
     instances(arena, 'nature/Rock_Medium_3', 2.0, 'w', rocks.filter((_, i) => !(i % 2)), { tint: 0x8a80a0 });
     for (let i = 0; i < 6; i++) { const c = crystal(); c.position.set(-7 + i * 2.8, 0, -6 - hash(i, 1) * 3); c.scale.setScalar(1.6); arena.add(c); }
     battleScene.background = new THREE.Color(0x0a0812); battleScene.fog = new THREE.Fog(0x0a0812, 10, 24);
-    bHemi.color.set(0x8a7ac8); bHemi.groundColor.set(0x1a1020); bHemi.intensity = 0.7; bSun.intensity = 1.0;
+    bHemi.color.set(0xb0a8e8); bHemi.groundColor.set(0x3a3048); bHemi.intensity = 1.5; bSun.intensity = 1.8; bSun.color.set(0xd8d0ff);
     bGlow.color.set(0x6af0ff); bGlow.position.set(-2, 3, -3); bGlow.intensity = 10;
     if (kind === 'boss') {
       const ring = new THREE.Group();
@@ -580,6 +586,7 @@ function screenToGround(cam, sx, sy, out = new THREE.Vector3()) {
 function project(cam, x, y, z) { tmpV.set(x, y, z).project(cam); return { x: (tmpV.x + 1) / 2 * LW, y: (1 - tmpV.y) / 2 * LH, z: tmpV.z }; }
 function battleStart(B, party, heroPos) {
   buildArena(B.bg);
+  battleCam.updateMatrixWorld(true); battleCam.matrixWorldInverse.copy(battleCam.matrixWorld).invert();
   for (const m of bModels) m.obj.removeFromParent();
   bModels = [];
   for (const e of B.enemies) {
@@ -611,7 +618,7 @@ function battleSync(dt, B, party, T) {
     if (e.lunge > 200 && mo.cur === 'idle') monPlay(mo, 'attack');
     if (e.flash > 0 && mo.cur === 'idle' && mo.actions.hit) monPlay(mo, 'hit');
     const fl = e.flash > 0 && Math.floor(e.flash / 60) % 2 === 0;
-    mo.obj.traverse((o) => { if (o.isMesh && o.material.emissive) { o.material.emissive.setRGB(fl ? 0.9 : 0, fl ? 0.9 : 0, fl ? 0.9 : 0); } });
+    mo.obj.traverse((o) => { if (o.isMesh && o.material.emissive) { if (fl) o.material.emissive.setRGB(0.9, 0.9, 0.9); else if (o.userData.baseEm) o.material.emissive.copy(o.userData.baseEm); else o.material.emissive.setRGB(0, 0, 0); } });
     if (!e.alive) {
       if (mo.cur !== 'death') monPlay(mo, 'death');
       mo.dieT = (mo.dieT || 0) + dt;

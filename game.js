@@ -5,11 +5,6 @@ let H = 192, S = 3;
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
 const buf = document.createElement('canvas'), bx0 = buf.getContext('2d');
 let bx = bx0;
-// the overworld is rendered into a larger buffer so more of the map fits on screen
-const WZ = 0.75, wbuf = document.createElement('canvas'), wbx = wbuf.getContext('2d');
-let WW = Math.round(W / WZ), WH = 256;
-const dark = document.createElement('canvas'), dkx = dark.getContext('2d');
-const bgCache = new Map();
 const SAVE_KEY = 'rootwell_save_v1', SET_KEY = 'rootwell_settings_v1';
 const FONT = 'Pixelify, "Trebuchet MS", sans-serif';
 const COL = { text: '#3d2a2f', dim: '#9b8580', gold: '#d2601a', hp: '#3fa84a', fp: '#3a78d4', red: '#d23a3a', light: '#fff6e4', panel: '#fbf3e6', border: '#131b1b' };
@@ -43,7 +38,7 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   S = Math.max(1, Math.min(8, Math.ceil((cw * dpr) / W)));
   if (cvs.width !== W * S || cvs.height !== H * S) { cvs.width = W * S; cvs.height = H * S; }
-  if (buf.height !== H) { buf.width = W; buf.height = H; WW = Math.round(W / WZ); WH = Math.round(H / WZ); wbuf.width = WW; wbuf.height = WH; dark.width = WW; dark.height = WH; bgCache.clear(); }
+  if (buf.height !== H) { buf.width = W; buf.height = H; }
 }
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 250));
@@ -468,9 +463,6 @@ const SAME = {
 };
 SAME['%'] = SAME.o = SAME['|'] = SAME['~']; SAME.D = SAME.H;
 const SOLID = new Set('T~#HRBOPCcSFKbYLrMQtuxwlzmqke '.split(''));
-const PROPS = { T: 'tree', t: 'bush', O: 'boulder', B: 'bramble', C: 'chest', c: 'chestOpen', S: 'sign', z: 'crystal', m: 'mushroom', r: 'rock', u: 'barrel', x: 'crate', w: 'well', l: 'lamp', q: 'plant', L: 'spring', Y: 'shelf', k: 'table', e: 'bed', K: 'counter' };
-const PROP_DY = { L: 32, T: 4 };
-const NO_SHADOW = new Set(['L', 'w', 'Y', 'q', 'l', 'k', 'u', 'x', 'S', 'C', 'c', 'T', 't', 'O', 'r', 'e', 'K', 'B', 'm', 'z']);
 
 function loadMap(id) {
   const def = MAPS[id];
@@ -493,22 +485,6 @@ function maskAt(x, y) {
   const s = (xx, yy) => (xx < 0 || yy < 0 || xx >= cur.w || yy >= cur.h ? true : f(cur.t[yy][xx]));
   return (s(x, y - 1) ? 1 : 0) | (s(x + 1, y) ? 2 : 0) | (s(x, y + 1) ? 4 : 0) | (s(x - 1, y) ? 8 : 0) |
     (s(x + 1, y - 1) ? 16 : 0) | (s(x + 1, y + 1) ? 32 : 0) | (s(x - 1, y + 1) ? 64 : 0) | (s(x - 1, y - 1) ? 128 : 0);
-}
-function tileK(x, y, c) {
-  if (c === 'M') { const s1 = tileAt(x, y + 1), s2 = tileAt(x, y + 2); if (s1 !== 'M' && s1 !== 'v') return 'face2'; if (s2 !== 'M' && s2 !== 'v') return 'face0'; return 'top'; }
-  if (c === '#') { const sd = tileAt(x, y + 1); if (sd !== '#' && sd !== ' ') return 'face'; const n = tileAt(x, y - 1); if (n !== '#' && n !== ' ') return 'rim'; return ''; }
-  if (c === '~') {
-    const isM = (xx, yy) => { const t = tileAt(xx, yy); return t === 'M' || t === 'v'; };
-    if (isM(x - 1, y) || isM(x + 1, y)) return 'fall' + (!isM(x - 1, y + 1) && !isM(x + 1, y + 1) ? 2 : y === 0 || isM(x - 1, y - 1) || isM(x + 1, y - 1) ? 1 : 0);
-    return '';
-  }
-  if (c === '|') return tileAt(x - 1, y) !== '|' ? 'L' : tileAt(x + 1, y) !== '|' ? 'R' : 'M';
-  if (c === 'Q') {
-    const fl = (xx, yy) => { const t = tileAt(xx, yy); return t !== 'Q' && t !== ' '; };
-    if (fl(x, y + 1)) return 'T'; if (fl(x, y - 1)) return 'B'; if (fl(x + 1, y)) return 'L'; if (fl(x - 1, y)) return 'R';
-    if (fl(x + 1, y + 1)) return 'TL'; if (fl(x - 1, y + 1)) return 'TR'; if (fl(x + 1, y - 1)) return 'BL'; if (fl(x - 1, y - 1)) return 'BR';
-  }
-  return '';
 }
 function syncNpcs() {
   if (!cur) return;
@@ -757,9 +733,6 @@ async function usePower(p, x, y) {
 }
 
 // ---------- map rendering ----------
-function bshadow(cx, cy, rx) { bx.fillStyle = 'rgba(20,10,30,0.25)'; bx.beginPath(); bx.ellipse(Math.round(cx), Math.round(cy), rx, Math.max(2, rx * 0.35), 0, 0, 6.3); bx.fill(); }
-function heroFrame(moving, anim) { return moving ? [1, 2, 3, 0][Math.floor(anim / 120) % 4] : 0; }
-function lookOfNpc(n) { return PEOPLE[n.who] ? PEOPLE[n.who].look : PEOPLE.pell.look; }
 let lastMapT = 0;
 function renderMap() {
   const dt = Math.min(50, T - (lastMapT || T)); lastMapT = T;
@@ -801,32 +774,6 @@ function ambient(cx, cy) {
     fx.push(p);
   }
 }
-function drawDarkness(cx, cy, px, py) {
-  const lit = state.flags.springSings;
-  dkx.globalCompositeOperation = 'source-over';
-  dkx.clearRect(0, 0, VW, VH);
-  dkx.fillStyle = lit ? 'rgba(10,6,30,0.45)' : 'rgba(8,4,22,0.86)'; dkx.fillRect(0, 0, VW, VH);
-  dkx.globalCompositeOperation = 'destination-out';
-  const hole = (x, y, r, a = 1) => { const g = dkx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.55, `rgba(0,0,0,${a * 0.7})`); g.addColorStop(1, 'rgba(0,0,0,0)'); dkx.fillStyle = g; dkx.fillRect(x - r, y - r, r * 2, r * 2); };
-  const flick = 1 + Math.sin(T / 90) * 0.03 + Math.sin(T / 37) * 0.02;
-  hole(px - cx + HT, py - cy + HT, 80 * flick);
-  const glows = [];
-  const gx0 = Math.max(0, Math.floor(cx / TS) - 3), gy0 = Math.max(0, Math.floor(cy / TS) - 3), gx1 = Math.min(cur.w - 1, gx0 + 16), gy1 = Math.min(cur.h - 1, gy0 + 18);
-  for (let y = gy0; y <= gy1; y++) for (let x = gx0; x <= gx1; x++) {
-    const c = cur.t[y][x], sx = x * TS - cx + HT, sy = y * TS - cy + HT;
-    if (c === 'z') { hole(sx, sy, 40); glows.push([sx, sy, 26, 'rgba(90,230,240,0.22)']); }
-    else if (c === 'm') { hole(sx, sy, 24, 0.8); glows.push([sx, sy, 16, 'rgba(220,120,255,0.2)']); }
-    else if (c === 'L') { hole(sx, sy, lit ? 110 : 30); glows.push([sx, sy, lit ? 60 : 20, lit ? 'rgba(120,255,220,0.3)' : 'rgba(160,140,220,0.15)']); }
-    else if (c === '%') hole(sx, sy, 10, 0.4);
-  }
-  for (const w of cur.def.trinkets || []) if (!(w.id in state.trinkets)) { hole(w.x * TS - cx + 8, w.y * TS - cy + 8, 22, 0.9); glows.push([w.x * TS - cx + 8, w.y * TS - cy + 8, 14, 'rgba(255,220,120,0.25)']); }
-  dkx.globalCompositeOperation = 'source-over';
-  bx.drawImage(dark, 0, 0);
-  bx.globalCompositeOperation = 'lighter';
-  for (const [x, y, r, col] of glows) { const g = bx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); bx.fillStyle = g; bx.fillRect(x - r, y - r, r * 2, r * 2); }
-  const g = bx.createRadialGradient(px - cx + HT, py - cy + HT, 0, px - cx + HT, py - cy + HT, 60); g.addColorStop(0, 'rgba(255,170,90,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0)'); bx.fillStyle = g; bx.fillRect(px - cx - 50, py - cy - 50, 116, 116);
-  bx.globalCompositeOperation = 'source-over';
-}
 function drawMapHUD() {
   if (UI.banner) {
     const b = UI.banner, a = clamp(Math.min(b.t / 400, (2600 - b.t) / 300), 0, 1);
@@ -851,7 +798,7 @@ function makeEnemy(id) {
 const bY = () => Math.round(H * 0.6) + 6;
 let HERO_H = 40;
 const BS = () => HERO_H / 16; // floating numbers etc. are offset by the hero's on-screen height
-const heroPos = (i) => ({ x: 206 + i * 30, y: bY() - 14 + i * 18 });
+const heroPos = (i) => ({ x: 198 + i * 30, y: bY() - 24 + i * 24 });
 const enemyHit = (e) => ({ x: e.x, y: e.y - e.sz.h * 0.5 - (e.d.float ? 14 : 0) });
 function anim(name, x, y, sc = 2, ms = 60) { if (B) B.anims.push({ name, x, y, sc, ms, t: 0 }); }
 async function msg(t, ms = 650) { B.msg = t; await waitOrTap(ms + t.length * 12); }
@@ -915,8 +862,9 @@ async function battle(ids, opt = {}) {
 }
 function layoutEnemies() {
   const al = B.enemies, n = al.length;
-  const xs = [[92], [62, 126], [38, 94, 150]][n - 1] || [92];
-  al.forEach((e, i) => { e.x = e.d.boss ? 92 : xs[i]; e.y = e.d.boss ? bY() + 18 : bY() + (n === 3 && i === 1 ? 10 : 0) + (n === 2 && i === 1 ? 8 : 0); });
+  const xs = [[86], [56, 122], [48, 104, 148]][n - 1] || [86];
+  const ys = [[0], [-14, 14], [16, -22, 22]][n - 1] || [0];
+  al.forEach((e, i) => { e.x = e.d.boss ? 96 : xs[i]; e.y = e.d.boss ? bY() + 6 : bY() + ys[i]; });
 }
 function checkEnd() { if (B.enemies.every((e) => !e.alive)) return 'win'; if (state.party.every((m) => m.hp <= 0)) return 'lose'; return null; }
 async function endRound() {
@@ -1174,48 +1122,7 @@ async function victory() {
 }
 
 // ---------- battle render ----------
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 function hexRgb(h) { const n = parseInt(h.slice(1, 7), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
-function ditherBand(g, y0, y1, cols) {
-  const w = W, h = y1 - y0; if (h <= 0) return;
-  const id = g.getImageData(0, y0, w, h), d = id.data, rgb = cols.map(hexRgb), n = cols.length;
-  for (let y = 0; y < h; y++) {
-    const t = (y / Math.max(1, h - 1)) * (n - 1), i = Math.min(n - 2, Math.floor(t)), f = t - i;
-    for (let x = 0; x < w; x++) {
-      const c = f * 16 > BAYER[((y + y0) % 4) * 4 + (x % 4)] + 0.5 ? rgb[i + 1] : rgb[i], k = (y * w + x) * 4;
-      d[k] = c[0]; d[k + 1] = c[1]; d[k + 2] = c[2]; d[k + 3] = 255;
-    }
-  }
-  g.putImageData(id, 0, y0);
-}
-function battleBg(kind) {
-  const key = kind + H;
-  if (bgCache.has(key)) return bgCache.get(key);
-  const [c, g] = ART.mk(W, H);
-  const hz = bY() - 60;
-  const cave = kind !== 'field';
-  for (let y = 0; y < H; y += TS) for (let x = 0; x < W; x += TS) {
-    const v = hash(x / TS + 3, y / TS + 7) % 8, fl = hash(x / TS + 11, y / TS + 5) % 9 === 0;
-    g.drawImage(ART.drawTile(cave ? '_' : fl && y > hz + 30 ? ',' : '.', { v, ground: cave ? '_' : '.' }), x, y);
-  }
-  if (!cave) {
-    for (let row = -3; row <= 0; row++) for (let x = -40 + (row % 2) * 24; x < W + 40; x += 44) { const t = ART.prop('tree', hash(x, row)); g.drawImage(t, x, hz - 40 + row * 26); }
-    for (let i = 0; i < 4; i++) g.drawImage(ART.prop('bush', i), (i * 79 + 10) % (W - 32), hz + 50 + ((i * 37) % 60));
-    const fg = g.createLinearGradient(0, 0, 0, hz + 20); fg.addColorStop(0, 'rgba(12,20,16,0.6)'); fg.addColorStop(1, 'rgba(12,20,16,0)'); g.fillStyle = fg; g.fillRect(0, 0, W, hz + 20);
-  } else {
-    const top = Math.floor(hz / TS) * TS;
-    for (let y = top - TS; y > -TS; y -= TS) for (let x = 0; x < W; x += TS) g.drawImage(ART.drawTile('#', { k: 'face', ground: '_' }), x, y);
-    for (let i = 0; i < 4; i++) g.drawImage(ART.prop(i % 2 ? 'crystal' : 'mushroom'), (i * 71 + 14) % (W - 32), top + 10 + ((i * 29) % 30));
-    if (kind === 'boss') g.drawImage(ART.prop('springLit'), 92 - 48, bY() - 40);
-    const vg = g.createRadialGradient(W / 2, H * 0.6, H * 0.15, W / 2, H * 0.6, H * 0.8); vg.addColorStop(0, 'rgba(10,5,25,0)'); vg.addColorStop(1, 'rgba(10,5,25,0.6)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
-  }
-  g.fillStyle = 'rgba(30,20,10,0.14)';
-  g.beginPath(); g.ellipse(94, bY() + 6, 90, 18, 0, 0, 6.3); g.fill(); g.beginPath(); g.ellipse(234, bY() + 12, 52, 22, 0, 0, 6.3); g.fill();
-  bgCache.set(key, c);
-  return c;
-}
-const hurtCache = new Map();
-function hurtSprite(im) { let c = hurtCache.get(im); if (!c) { c = ART.tint(im, '#ff5a5a'); hurtCache.set(im, c); } return c; }
 function renderBattle(dt) {
   bx.clearRect(0, 0, W, H);
   B.shake = Math.max(0, B.shake - dt);

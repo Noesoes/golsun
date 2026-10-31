@@ -1,6 +1,6 @@
 # Rootwell: Song of Mossbell Vale
 
-A cozy pixel-art adventure RPG that runs in your phone's browser and installs to your home screen like an app. It works offline once installed.
+A cozy 3D adventure RPG that runs in your phone's browser and installs to your home screen like an app. It works offline once installed.
 
 **Play it:** https://noesoes.github.io/golsun/
 
@@ -18,11 +18,11 @@ Together they travel through Windmere Fields and into Whisper Grotto to find out
 
 ## Features
 
-- **Hand-drawn pixel art and music** from the free Ninja Adventure pack: animated characters with portraits, monsters, a boss, auto-tiled terrain, houses, cave lighting and effects, plus a real soundtrack.
+- **A 3D world** built with three.js from free CC0 model packs: animated characters, monsters and a boss, a village of real buildings, forests, rivers, a waterfall, a lit cave and 3D battles, plus a real soundtrack.
 - **Tool puzzles.** Wren's *Gust* blows boulders across the floor, even into pits. Bram's *Kindle* burns away brambles. Tamsin's *Lilypad* seeds grow pads you can walk across water on.
 - **Side-view turn-based battles.** Use skills, items and Guard, and exploit Gale, Ember and Bloom weaknesses. Your party shares a **Harmony** gauge; when it's full, unleash a hero's **Burst** move.
 - **Trinkets.** Four hidden charms with passive bonuses. Each hero can wear one.
-- **Phone-friendly controls.** Tap anywhere to walk there, and tap people or objects to interact. You can also use the D-pad and buttons. Prompts show what you can interact with, and the A button's label changes to match (Talk, Open, Use...).
+- **Phone-friendly controls.** Tap anywhere to walk there, and tap people or objects to interact. You can also use the analog stick and buttons. Prompts show what you can interact with, and the A button's label changes to match (Talk, Open, Use...).
 - **Quality of life.** A goal tracker, autosave whenever you change areas, "Try again" after losing a battle, an Auto-battle command, and settings for music, sound and text speed.
 
 ## Controls
@@ -55,21 +55,24 @@ python3 -m http.server 8000
 ## Files
 
 - `index.html`: page layout and touch controls
-- `art.js`: loads the sprite sheets and slices them into tiles, props, characters, portraits, enemies and effects
+- `world3d.js`: the 3D renderer (three.js): overworld, interiors, caves, battles, title and character portraits
+- `art.js`: loads the item icons, battle effects and UI frames
+- `lib/`: three.js and its glTF loader (MIT)
 - `assets/`: the art and music used by the game (see credits below)
 - `tools/build_assets.py`: copies the needed pieces out of the asset pack and converts the music
-- `tools/build_pipoya.py`: copies the Pipoya world tiles, buildings and characters
-- `tools/build_monsters.py`: builds the battle monsters from the two monster packs
-- `game.js`: engine (rendering, input, maps, battles, menus, audio)
+- `tools/build_3d.sh`: optimizes the 3D models from the free CC0 packs into `assets/3d`
+- `game.js`: engine (input, maps, battles, menus, UI overlay, audio)
 - `data.js`: heroes, skills, Trinkets, items, enemies, maps and the story
 - `sw.js`, `manifest.webmanifest`, `icon-*.png`: installable, offline-capable app (PWA)
 - `fonts/`: [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans), licensed under the SIL Open Font License (see `fonts/OFL.txt`)
 
 ## Credits
 
-- Art, music and jingles: [Ninja Adventure asset pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack) by Pixel-Boy and AAA, released under CC0.
-- World tiles, buildings and characters: [FREE RPG Tileset 32x32](https://pipoya.itch.io/pipoya-rpg-tileset-32x32) and [FREE RPG Character Sprites 32x32](https://pipoya.itch.io/pipoya-free-rpg-character-sprites-32x32) by Pipoya.
-- Battle monsters: [Pipoya Free RPG Monster Pack](https://pipoya.itch.io/free-rpg-monster-pack) and [Creature Collector 64x64](https://dadddydarko.itch.io/creature-collector-64x64-2d-various-creatures-with-different-themes) by dadddydarko.
+- 3D world, buildings and props: [Stylized Nature MegaKit](https://quaternius.itch.io/stylized-nature-megakit) and [Fantasy Props MegaKit](https://quaternius.itch.io/fantasy-props-megakit) by Quaternius, and [KayKit Medieval Hexagon Pack](https://kaylousberg.itch.io/kaykit-medieval-hexagon) by Kay Lousberg (CC0).
+- 3D characters: [KayKit Character Pack: Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) by Kay Lousberg (CC0).
+- 3D monsters: Easy Enemies and LowPoly Animated Monsters by [Quaternius](https://quaternius.com) (CC0).
+- Icons, effects, UI frames, music and jingles: [Ninja Adventure asset pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack) by Pixel-Boy and AAA (CC0).
+- Rendering: [three.js](https://threejs.org) (MIT).
 - Font: Pixelify Sans, licensed under the SIL Open Font License.
 
 Rootwell's world, characters, story and mechanics are original to this project.

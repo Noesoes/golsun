@@ -1,22 +1,14 @@
-Art, music and jingles in this folder come from the "Ninja Adventure" asset pack
-by Pixel-Boy and AAA: https://pixel-boy.itch.io/ninja-adventure-asset-pack
-Released under Creative Commons Zero (CC0). Thank you!
-
-Only the pieces Rootwell uses are included; music was converted from OGG to MP3.
+Icons, battle effects, UI frames, music and jingles (assets/icons, fx, ui, music) come from the
+"Ninja Adventure" asset pack by Pixel-Boy and AAA: https://pixel-boy.itch.io/ninja-adventure-asset-pack
+Released under Creative Commons Zero (CC0). Music was converted from OGG to MP3.
 Rebuild with: python3 tools/build_assets.py "/path/to/Ninja Adventure - Asset Pack"
 
-Battle monsters (assets/monsters) come from two free packs, used under their licenses
-(free for personal and commercial use, no redistribution as standalone assets):
-  - Pipoya Free RPG Monster Pack by Pipoya: https://pipoya.itch.io/free-rpg-monster-pack
-    (slime, mushroom, ghost, wraith; downscaled and pixelated for this game)
-  - Creature Collector 64x64 by dadddydarko: https://dadddydarko.itch.io/creature-collector-64x64-2d-various-creatures-with-different-themes
-    (turtle, moth, squirrel, wasp, worm)
-Rebuild with: python3 tools/build_monsters.py <Pipoya "non shade" folder> <"Static Creatures" folder>
+3D models (assets/3d), all released under CC0. Textures were compressed to WebP with gltf-transform:
+  - Stylized Nature MegaKit by Quaternius: https://quaternius.itch.io/stylized-nature-megakit
+  - Fantasy Props MegaKit by Quaternius: https://quaternius.itch.io/fantasy-props-megakit
+  - Easy Enemies and LowPoly Animated Monsters by Quaternius: https://quaternius.com
+  - KayKit Character Pack: Adventurers by Kay Lousberg: https://kaylousberg.itch.io/kaykit-adventurers
+  - KayKit Medieval Hexagon Pack by Kay Lousberg: https://kaylousberg.itch.io/kaykit-medieval-hexagon
+Rebuild with: tools/build_3d.sh
 
-
-World tiles, buildings, furniture and all characters (assets/pipoya) come from Pipoya's free packs
-(free for personal and commercial use, no redistribution as standalone assets):
-  - FREE RPG Tileset 32x32: https://pipoya.itch.io/pipoya-rpg-tileset-32x32
-    (buildings are cut from the pack's own sample map)
-  - FREE RPG Character Sprites 32x32: https://pipoya.itch.io/pipoya-free-rpg-character-sprites-32x32
-Rebuild with tools/build_pipoya.py.
+three.js (lib/) is MIT licensed, see lib/THREE_LICENSE.txt.
