@@ -58,7 +58,7 @@ python3 -m http.server 8000
 - `art.js`: loads the sprite sheets and slices them into tiles, props, characters, portraits, enemies and effects
 - `assets/`: the art and music used by the game (see credits below)
 - `tools/build_assets.py`: copies the needed pieces out of the asset pack and converts the music
-- `tools/build_cainos.py`: adds the Cainos outdoor tiles
+- `tools/build_pipoya.py`: copies the Pipoya world tiles, buildings and characters
 - `tools/build_monsters.py`: builds the battle monsters from the two monster packs
 - `game.js`: engine (rendering, input, maps, battles, menus, audio)
 - `data.js`: heroes, skills, Trinkets, items, enemies, maps and the story
@@ -68,7 +68,7 @@ python3 -m http.server 8000
 ## Credits
 
 - Art, music and jingles: [Ninja Adventure asset pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack) by Pixel-Boy and AAA, released under CC0.
-- Outdoor terrain: [Pixel Art Top Down - Basic](https://cainos.itch.io/pixel-art-top-down-basic) by Cainos.
+- World tiles, buildings and characters: [FREE RPG Tileset 32x32](https://pipoya.itch.io/pipoya-rpg-tileset-32x32) and [FREE RPG Character Sprites 32x32](https://pipoya.itch.io/pipoya-free-rpg-character-sprites-32x32) by Pipoya.
 - Battle monsters: [Pipoya Free RPG Monster Pack](https://pipoya.itch.io/free-rpg-monster-pack) and [Creature Collector 64x64](https://dadddydarko.itch.io/creature-collector-64x64-2d-various-creatures-with-different-themes) by dadddydarko.
 - Font: Pixelify Sans, licensed under the SIL Open Font License.
 

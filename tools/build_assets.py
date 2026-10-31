@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy the subset of the Ninja Adventure asset pack (CC0, by Pixel-Boy & AAA) that
+"""Copy the icons, effects, UI frames and music Rootwell uses from of the Ninja Adventure asset pack (CC0, by Pixel-Boy & AAA) that
 Rootwell uses into ./assets, and convert audio to MP3.
 
 Usage: python3 tools/build_assets.py "/path/to/Ninja Adventure - Asset Pack"
@@ -24,22 +24,12 @@ def mp3(src, dst, br='64k', mono=False):
 for sub in ['tiles', 'chars', 'faces', 'icons', 'misc', 'fx', 'ui', 'music']:
     if os.path.isdir(os.path.join(DST, sub)): shutil.rmtree(os.path.join(DST, sub))
 # battle monsters come from tools/build_monsters.py
-tiles = {'floor': T + 'TilesetFloor.png', 'nature': T + 'TilesetNature.png', 'water': T + 'TilesetWater.png',
-         'house': T + 'TilesetHouse.png', 'element': T + 'TilesetElement.png', 'detail': T + 'TilesetFloorDetail.png',
-         'hole': T + 'TilesetHole.png', 'relief': T + 'TilesetRelief.png', 'ifloor': T + 'Interior/TilesetInteriorFloor.png',
-         'wall': T + 'Interior/TilesetWallSimple.png'}
-for k, v in tiles.items(): cp(v, f'tiles/{k}.png')
 
-chars = ['Woman', 'Hunter', 'Cavegirl', 'OldWoman', 'OldMan2', 'Princess', 'Boy', 'SorcererOrange', 'Villager4', 'OldMan', 'Inspector']
-for c in chars:
-    cp(f'Actor/Character/{c}/SpriteSheet.png', f'chars/{c}.png')
-    cp(f'Actor/Character/{c}/Faceset.png', f'faces/{c}.png')
 
 icons = {'herb': 'Items/Resource/Grass.png', 'tonic': 'Items/Food/TeaLeaf.png', 'plume': 'Items/Potion/LifePot.png',
          'berry': 'Items/Potion/Heart.png', 'weapon': 'Items/Weapons/Sword/Sprite.png', 'armor': 'Items/Resource/BarIron.png',
          'trinket': 'Items/Resource/GemYellow.png', 'gold': 'Items/Treasure/GoldCoin.png'}
 for k, v in icons.items(): cp(v, f'icons/{k}.png')
-cp('Items/Treasure/LittleTreasureChest.png', 'misc/chest.png')
 
 fx = {'ember': 'FX/Elemental/Flam/SpriteSheet.png', 'bloom': 'FX/Elemental/Plant/SpriteSheet.png', 'gale': 'FX/Elemental/Thunder/SpriteSheet.png',
       'hush': 'FX/Magic/Spirit/SpriteSheet.png', 'smoke': 'FX/Smoke/SmokeCircular/SpriteSheet.png', 'heal': 'FX/Magic/Circle/SpriteSheetWhite.png',

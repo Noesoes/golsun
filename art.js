@@ -1,9 +1,8 @@
 'use strict';
 // ===================== Rootwell — art =====================
-// Pixel art from the "Ninja Adventure" asset pack by Pixel-Boy & AAA (CC0); battle monsters from
-// the Pipoya Free RPG Monster Pack and Creature Collector 64x64 by dadddydarko; outdoor ground,
-// trees, rocks and walls from "Pixel Art Top Down - Basic" by Cainos.
-// This module loads the sprite sheets and slices them into cached 1:1 canvases.
+// World, buildings and characters: Pipoya's FREE RPG Tileset 32x32 and FREE RPG Character Sprites 32x32.
+// Battle monsters: Pipoya Free RPG Monster Pack + Creature Collector 64x64 (dadddydarko).
+// Item icons, battle effects and UI frames: Ninja Adventure (Pixel-Boy & AAA, CC0).
 const ART = (() => {
   const IMG = {};
   let META = {};
@@ -14,19 +13,17 @@ const ART = (() => {
   function flash(c) { return memo(c, () => tint(c, 'rgba(255,255,255,0.85)')); }
 
   const FILES = {
-    tiles: ['floor', 'nature', 'water', 'water_c', 'house', 'element', 'detail', 'hole', 'relief', 'ifloor', 'wall', 'c_grass', 'c_stone', 'c_wall', 'c_plant', 'c_props'],
-    chars: ['Woman', 'Hunter', 'Cavegirl', 'OldWoman', 'OldMan2', 'Princess', 'Boy', 'SorcererOrange', 'Villager4', 'OldMan', 'Inspector'],
+    pipoya: ['base', 'grass', 'path', 'water', 'cavewater', 'tallgrass', 'wallup', 'wallup2', 'dirt'],
+    'pipoya/houses': ['cottage', 'shop', 'forge', 'inn', 'stone', 'stall'],
+    'pipoya/chars': ['wren', 'bram', 'tamsin', 'gran', 'pell', 'rosa', 'pip', 'ivy', 'marta', 'dorrit', 'odo'],
     monsters: ['slime', 'squirrel', 'wasp', 'worm', 'mushroom', 'turtle', 'moth', 'ghost', 'wraith'],
     icons: ['herb', 'tonic', 'plume', 'berry', 'weapon', 'armor', 'trinket', 'gold'],
     fx: ['ember', 'bloom', 'gale', 'hush', 'smoke', 'heal', 'slash', 'leaf', 'leafpink'],
     ui: ['panel', 'panel_dark', 'faceframe', 'arrow'],
-    misc: ['chest'],
   };
-  FILES.faces = FILES.chars.slice();
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('missing ' + src)); i.src = src; }); }
   async function load(onProgress) {
-    const jobs = [];
-    let done = 0, total = 0;
+    const jobs = []; let done = 0, total = 0;
     for (const [dir, names] of Object.entries(FILES)) for (const n of names) {
       total++;
       jobs.push(loadImg(`assets/${dir}/${n}.png`).then((im) => { IMG[dir + '/' + n] = im; if (onProgress) onProgress(++done / total); }));
@@ -37,159 +34,99 @@ const ART = (() => {
   function crop(key, x, y, w, h) {
     return memo(`c|${key}|${x}|${y}|${w}|${h}`, () => { const [c, g] = mk(w, h); g.drawImage(IMG[key], x, y, w, h, 0, 0, w, h); return c; });
   }
-  const T = (sheet, tx, ty, tw = 1, th = 1) => crop('tiles/' + sheet, tx * 16, ty * 16, tw * 16, th * 16);
-  // Cainos sheets use a 32px grid; trim() crops a region and trims it to its visible pixels
-  function trim(key, x, y, w, h) {
-    return memo(`trim|${key}|${x}|${y}|${w}|${h}`, () => {
-      const [c, g] = mk(w, h); g.drawImage(IMG[key], x, y, w, h, 0, 0, w, h);
-      const d = g.getImageData(0, 0, w, h).data; let x0 = w, y0 = h, x1 = -1, y1 = -1;
-      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (d[(yy * w + xx) * 4 + 3] > 8) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
-      if (x1 < 0) return c;
-      const [o, og] = mk(x1 - x0 + 1, y1 - y0 + 1); og.drawImage(c, -x0, -y0); return o;
+  const B = (cx, cy, cw = 1, ch = 1) => crop('pipoya/base', cx * 32, cy * 32, cw * 32, ch * 32);
+
+  // RPG Maker "A2" autotile (64x96): compose a 32px tile from four 16px quarters using an 8-neighbour mask
+  // bits: 1 N, 2 E, 4 S, 8 W, 16 NE, 32 SE, 64 SW, 128 NW
+  function autotile(key, mask) {
+    return memo(`a|${key}|${mask}`, () => {
+      const [c, g] = mk(32, 32), im = IMG['pipoya/' + key];
+      const n = mask & 1, e = mask & 2, s = mask & 4, w = mask & 8, ne = mask & 16, se = mask & 32, sw = mask & 64, nw = mask & 128;
+      const q = (sx, sy, dx, dy) => g.drawImage(im, sx * 16, sy * 16, 16, 16, dx, dy, 16, 16);
+      q(...(!n && !w ? [0, 2] : !n ? [2, 2] : !w ? [0, 4] : !nw ? [2, 0] : [2, 4]), 0, 0);
+      q(...(!n && !e ? [3, 2] : !n ? [1, 2] : !e ? [3, 4] : !ne ? [3, 0] : [1, 4]), 16, 0);
+      q(...(!s && !w ? [0, 5] : !s ? [2, 5] : !w ? [0, 3] : !sw ? [2, 1] : [2, 3]), 0, 16);
+      q(...(!s && !e ? [3, 5] : !s ? [1, 5] : !e ? [3, 3] : !se ? [3, 1] : [1, 3]), 16, 16);
+      return c;
     });
   }
-  const C32 = (sheet, cx, cy, cw = 1, ch = 1) => trim('tiles/' + sheet, cx * 32, cy * 32, cw * 32, ch * 32);
-  // a 16px quarter of a 32px Cainos tile: q = (x&1) | (y&1)<<1
-  const Q = (sheet, cx, cy, q) => crop('tiles/' + sheet, cx * 32 + (q & 1) * 16, cy * 32 + (q >> 1) * 16, 16, 16);
+  const full = (key) => autotile(key, 255);
 
-  // 16-piece auto-tile layout used by the pack (3x3 blob + 1-wide strips), anchored at (bx,by)
-  function m16(mask) {
-    const N = mask & 1, E = mask & 2, S = mask & 4, Wd = mask & 8;
-    if (N && E && S && Wd) return [1, 1];
-    if (!N && E && S && Wd) return [1, 0];
-    if (N && E && !S && Wd) return [1, 2];
-    if (N && !E && S && Wd) return [2, 1];
-    if (N && E && S && !Wd) return [0, 1];
-    if (!N && E && S && !Wd) return [0, 0];
-    if (!N && !E && S && Wd) return [2, 0];
-    if (N && E && !S && !Wd) return [0, 2];
-    if (N && !E && !S && Wd) return [2, 2];
-    if (!N && !E && S && !Wd) return [3, 0];
-    if (N && !E && S && !Wd) return [3, 1];
-    if (N && !E && !S && !Wd) return [3, 2];
-    if (!N && E && !S && !Wd) return [0, 3];
-    if (!N && E && !S && Wd) return [1, 3];
-    if (!N && !E && !S && Wd) return [2, 3];
-    return [3, 3];
-  }
-  const auto = (sheet, bx, by, mask) => { const [dx, dy] = m16(mask); return T(sheet, bx + dx, by + dy); };
-
-  // cave water: the pack's purple pool recoloured to deep blue
-  function caveWaterSheet() {
-    return memo('cavewater', () => {
-      const [c, g] = mk(64, 64); g.drawImage(IMG['tiles/water'], 13 * 16, 6 * 16, 64, 64, 0, 0, 64, 64);
-      const id = g.getImageData(0, 0, 64, 64), d = id.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const r = d[i], gg = d[i + 1], b = d[i + 2];
-        if (r > gg + 20 && b > gg + 20) { const l = (r + gg + b) / 3; d[i] = l * 0.35; d[i + 1] = l * 0.62 + 20; d[i + 2] = Math.min(255, l * 1.05 + 30); }
-      }
-      g.putImageData(id, 0, 0); return c;
-    });
-  }
-  // lily pad pixels lifted off the pack's lily-on-water tile
-  function lily() {
-    return memo('lily', () => {
-      const [c, g] = mk(16, 16); g.drawImage(T('water', 11, 3), 0, 0);
-      const plain = T('water', 11, 0).getContext('2d').getImageData(0, 0, 16, 16).data;
-      const id = g.getImageData(0, 0, 16, 16), d = id.data;
-      for (let i = 0; i < d.length; i += 4) { const leafy = d[i + 1] > d[i + 2] + 8, dark = d[i] + d[i + 1] + d[i + 2] < 200; if (!leafy && !dark) d[i + 3] = 0; }
-      g.putImageData(id, 0, 0); return c;
-    });
-  }
-
-  // ------------------------------------------------------------------ ground tiles
-  let GQ = { bv: 0, q: 0 };
-  function grass(g) { const i = GQ.bv % 16; g.drawImage(Q('c_grass', i % 4, i >> 2, GQ.q), 0, 0); }
-  function caveFloor(g, v) { g.drawImage(v < 6 ? T('floor', 11, 19) : T('floor', v === 6 ? 12 : 13, 19), 0, 0); }
-  function wood(g) { g.drawImage(T('ifloor', 1, 1), 0, 0); }
-  function water(g, mask, cave) {
-    if (cave) { const [dx, dy] = m16(mask); g.drawImage(caveWaterSheet(), dx * 16, dy * 16, 16, 16, 0, 0, 16, 16); }
-    else g.drawImage(auto('water_c', 0, 6, mask), 0, 0);
-  }
-  const WALL_PIECES = { TL: [0, 0], T: [1, 0], TR: [4, 0], L: [0, 1], R: [4, 1], BL: [0, 4], B: [1, 4], BR: [4, 4] };
+  // ------------------------------------------------------------------ ground tiles (32x32)
+  function grass(g, v) { g.drawImage(full('grass'), 0, 0); if (v === 3) g.drawImage(B(1, 6), 0, 0); else if (v === 6) g.drawImage(B(3, 6), 0, 0); }
+  function caveFloor(g, v) { g.drawImage(full('dirt'), 0, 0); if (v === 5) g.drawImage(B(0, 8), 4, 6, 20, 20); }
+  function wood(g) { g.drawImage(B(0, 36), 0, 0); }
   function drawTile(ch, info) {
-    const { v = 0, mask = 15, f = 0, ground = '.', k = '', bv = 0, q = 0 } = info;
-    GQ = { bv, q };
-    return memo(`t|${ch}|${v}|${mask}|${f}|${ground}|${k}|${bv}|${q}`, () => {
-      const [c, g] = mk(16, 16);
-      const under = () => (ground === '_' ? caveFloor(g, v) : ground === 'W' ? wood(g) : grass(g));
+    const { v = 0, mask = 255, ground = '.', k = '' } = info;
+    return memo(`t|${ch}|${v}|${mask}|${ground}|${k}`, () => {
+      const [c, g] = mk(32, 32);
       const cave = ground === '_';
+      const under = () => (cave ? caveFloor(g, v) : ground === 'W' ? wood(g) : grass(g, v));
+      const water = () => { if (!cave) grass(g, 0); else caveFloor(g, 0); g.drawImage(autotile(cave ? 'cavewater' : 'water', mask), 0, 0); };
       switch (ch) {
-        case '.': grass(g); break;
-        case ',': { const i = bv % 16; g.drawImage(Q('c_grass', 4 + (i % 4), i >> 2, q), 0, 0); break; }
-        case '"': { grass(g); const t = C32('c_plant', v % 4, 12 + (v >> 2) % 2); g.drawImage(t, Math.round((16 - t.width) / 2), 15 - t.height); break; }
-        case '=': { const P = [[0, 4], [1, 4], [0, 5], [1, 5]][bv % 4]; g.drawImage(Q('c_grass', P[0], P[1], q), 0, 0); break; }
-        case '~':
-          if (k.startsWith('fall')) { g.drawImage(T('relief', 7, +k[4]), 0, 0); break; }
-          water(g, mask, cave); break;
-        case '%': water(g, mask, cave); g.drawImage(lily(), 0, 0); break;
-        case 'o': water(g, mask, cave); g.drawImage(T('nature', 4, 13), 0, 1); break;
-        case '|': g.drawImage(T('water_c', 1, 7), 0, 0); g.drawImage(T('water', k === 'L' ? 0 : k === 'R' ? 2 : 1, 15), 0, 0); break;
-        case 'M': if (k === 'top') grass(g); else g.drawImage(crop('tiles/c_wall', (1 + (bv % 4)) * 32 + (q & 1) * 16, k === 'face0' ? 6 * 32 : 7 * 32 + 16, 16, 16), 0, 0); break;
-        case 'v': g.drawImage(crop('tiles/c_wall', 32 + (q & 1) * 16, 7 * 32 + 16, 16, 16), 0, 0); g.drawImage(T('nature', 7, 13), 0, 0); break;
-        case '#':
-          if (k === 'face') g.drawImage(T('relief', 5, 2), 0, 0);
-          else if (k === 'rim') g.drawImage(T('hole', 1, 0), 0, 0);
-          else g.drawImage(T('hole', 1, 1), 0, 0);
-          break;
+        case '.': grass(g, v); break;
+        case ',': grass(g, 0); g.drawImage(B(4 + (v % 3), 6), 0, 0); break;
+        case '"': grass(g, 0); g.drawImage(autotile('tallgrass', mask), 0, 0); break;
+        case '=': g.drawImage(autotile('path', mask), 0, 0); break;
+        case '~': water(); break;
+        case '%': water(); g.drawImage(B(3, 7), 0, 0); break;
+        case 'o': water(); g.drawImage(B(0, 8), 0, 2); break;
+        case '|': { g.drawImage(full('water'), 0, 0); g.drawImage(B(1, 34), 0, 0); break; }
+        case 'M': g.drawImage(k === 'top' ? B(1, 10) : B(1, k === 'face0' ? 12 : 13), 0, 0); break;
+        case 'v': g.drawImage(B(2, 18), 0, 0); break;
+        case '#': if (k === 'face') g.drawImage(B(1, 17), 0, 0); else { caveFloor(g, 0); g.drawImage(autotile('wallup2', mask), 0, 0); } break;
         case '_': caveFloor(g, v); break;
-        case 'P': caveFloor(g, v); g.drawImage(T('hole', 3, 0), 0, 0); break;
-        case 'p': caveFloor(g, v); g.drawImage(T('detail', 15, 0), 0, 0); break;
-        case 'X': if (ground === 'W') { wood(g); g.drawImage(T('ifloor', 0, 5), 0, 0); } else g.drawImage(T('hole', 1, 0), 0, 0); break;
+        case 'P': caveFloor(g, 0); g.drawImage(B(2, 8), 0, 0); break;
+        case 'p': caveFloor(g, 0); g.drawImage(B(4, 21), 0, 0); break;
+        case 'X': if (ground === 'W') { wood(g); g.drawImage(B(5, 40), 4, 8, 24, 16); } else { caveFloor(g, 0); g.drawImage(B(2, 8), 0, 0); } break;
         case 'W': wood(g); break;
-        case 'g': g.drawImage(T('ifloor', 16, 2), 0, 0); break;
-        case 'K': wood(g); g.drawImage(T('element', 3, 10), 0, 0); break;
-        case 'Q': { const p = WALL_PIECES[k]; if (p) g.drawImage(T('wall', p[0], p[1]), 0, 0); else { g.fillStyle = '#151a1a'; g.fillRect(0, 0, 16, 16); } break; }
-        case 'F': grass(g); g.drawImage(T('house', 11, 5), 0, 0); break;
-        case 'b': grass(g); g.drawImage(T('nature', v % 2, 11), 0, 0); break;
+        case 'g': wood(g); g.drawImage(B(2, 38), 0, 0); break;
+        case 'Q': if (k === 'T') g.drawImage(B(0, 45), 0, 0); else g.drawImage(autotile('wallup', mask), 0, 0); break;
+        case 'F': grass(g, v); g.drawImage(B(7, 22), 0, 0); break;
+        case 'b': grass(g, 0); g.drawImage(B(7, 6), 0, 0); break;
         default: under();
       }
       return c;
     });
   }
 
-  // ------------------------------------------------------------------ props
-  const HOUSES = { cottage: [0, 0, 4, 3], red: [12, 0, 4, 3], shop: [16, 0, 3, 3], inn: [19, 0, 4, 3], forge: [26, 0, 3, 3], hut: [23, 0, 3, 3] };
-  function house(kind) { const h = HOUSES[kind]; return T('house', h[0], h[1], h[2], h[3]); }
+  // ------------------------------------------------------------------ props & buildings
+  function house(kind) { return IMG['pipoya/houses/' + kind]; }
   function prop(name, v = 0) {
     switch (name) {
-      case 'tree': return [C32('c_plant', 1, 0, 4, 5), C32('c_plant', 5, 0, 4, 5), C32('c_plant', 9, 0, 4, 5)][v % 3];
-      case 'hedge': return [C32('c_plant', 3, 6), C32('c_plant', 3, 6), C32('c_plant', 1, 6, 1, 1), C32('c_plant', 3, 6)][v % 4];
-      case 'bush': return [C32('c_plant', 3, 6), C32('c_plant', 1, 6)][v % 2];
-      case 'boulder': return C32('c_props', 5, 15);
-      case 'bramble': return memo('bramble', () => { const [c, g] = mk(16, 16); g.drawImage(T('nature', 9, 10), 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(70,20,60,0.35)'; g.fillRect(0, 0, 16, 16);
-        g.globalCompositeOperation = 'source-over'; g.fillStyle = '#ff7ab0'; for (const [x, y] of [[4, 5], [11, 4], [8, 9], [3, 11], [12, 11]]) g.fillRect(x, y, 1, 1); return c; });
-      case 'chest': return crop('misc/chest', 0, 0, 16, 16);
-      case 'chestOpen': return crop('misc/chest', 16, 0, 16, 16);
-      case 'sign': return C32('c_props', 3, 5);
-      case 'crystal': return T('nature', 1, 14);
-      case 'mushroom': return T('detail', 4, 0);
-      case 'rock': return C32('c_props', 3, 15);
-      case 'barrel': return T('element', 1, 0);
-      case 'crate': return T('element', 0, 0);
-      case 'well': return T('element', 6, 2);
-      case 'lamp': return T('element', 6, 3, 1, 2);
-      case 'plant': return T('element', 0, 7, 1, 2);
-      case 'shelf': return T('element', v % 2 ? 4 : 3, 7, 1, 2);
-      case 'table': return T('element', 3, 9);
-      case 'spring': return T('wall', 2, 1, 2, 2);
-      case 'springLit': return memo('springLit', () => {
-        const [c, g] = mk(32, 32); g.drawImage(T('wall', 2, 1, 2, 2), 0, 0);
-        g.fillStyle = '#3fd0c8'; g.beginPath(); g.ellipse(16, 16, 7, 7, 0, 0, 6.3); g.fill();
-        g.fillStyle = '#a8fff0'; g.fillRect(12, 12, 3, 2); g.fillRect(18, 17, 2, 1); return c; });
-      case 'tuft': return memo('tuft' + v, () => { const [c, g] = mk(16, 16); const t = C32('c_plant', v % 4, 12 + (v >> 2) % 2); const ty = 15 - t.height; g.drawImage(t, 0, Math.ceil(t.height / 2), t.width, Math.floor(t.height / 2), Math.round((16 - t.width) / 2), ty + Math.ceil(t.height / 2), t.width, Math.floor(t.height / 2)); return c; });
+      case 'tree': return [B(0, 1, 2, 2), B(2, 1, 2, 2), B(0, 1, 2, 2)][v % 3];
+      case 'hedge': case 'bush': return [B(0, 5), B(1, 5)][v % 2];
+      case 'boulder': return B(1, 8);
+      case 'rock': return B(0, 8);
+      case 'bramble': return B(3, 5);
+      case 'chest': return B(6, 107);
+      case 'chestOpen': return B(6, 108);
+      case 'sign': return B(5, 28, 1, 2);
+      case 'crystal': return B(6, 124);
+      case 'mushroom': return B(0, 7);
+      case 'barrel': return B(3, 109);
+      case 'crate': return B(4, 108);
+      case 'well': return B(2, 28);
+      case 'lamp': return B(3, 113, 1, 2);
+      case 'plant': return B(7, 113, 1, 2);
+      case 'shelf': return B(3, 89, 1, 2);
+      case 'table': return B(4, 89);
+      case 'bed': return B(1, 97, 1, 2);
+      case 'counter': return B(1, 106);
+      case 'spring': return memo('springDim', () => { const [c, g] = mk(96, 96); g.drawImage(B(0, 116, 3, 3), 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(40,40,60,0.55)'; g.fillRect(0, 0, 96, 96); return c; });
+      case 'springLit': return B(0, 116, 3, 3);
+      case 'tuft': return memo('tuft', () => { const [c, g] = mk(32, 32); g.drawImage(IMG['pipoya/tallgrass'], 16, 64, 32, 14, 0, 18, 32, 14); return c; });
     }
-    return T('nature', 4, 13);
+    return B(0, 8);
   }
 
-  // ------------------------------------------------------------------ actors
-  const DIRCOL = { down: 0, up: 1, left: 2, right: 3 };
-  function charSprite(look, dir, frame) { return crop('chars/' + look.sheet, DIRCOL[dir] * 16, (frame | 0) * 16, 16, 16); }
-  function portrait(look) { return IMG['faces/' + look.sheet]; }
-  // battle monsters (Pipoya + Creature Collector, see tools/build_monsters.py): single static frames
+  // ------------------------------------------------------------------ characters (3 frames x 4 directions, 32x32)
+  const DIRROW = { down: 0, left: 1, right: 2, up: 3 };
+  const FCOL = [1, 0, 1, 2, 0];
+  function charSprite(look, dir, frame) { return crop('pipoya/chars/' + look.sheet, FCOL[(frame | 0) % 5] * 32, DIRROW[dir] * 32, 32, 32); }
+  function portrait(look) { return memo('pt|' + look.sheet, () => { const [c, g] = mk(38, 38); g.drawImage(IMG['pipoya/chars/' + look.sheet], 32 + 6, 0, 19, 19, 0, 0, 38, 38); return c; }); }
   function enemySprite(shape, frame, fl) {
-    const im = IMG['monsters/' + shape];
-    const c = crop('monsters/' + shape, 0, 0, im.width, im.height);
+    const im = IMG['monsters/' + shape], c = crop('monsters/' + shape, 0, 0, im.width, im.height);
     return fl ? flash(c) : c;
   }
   const enemySize = (shape) => { const im = IMG['monsters/' + shape]; return { w: im.width, h: im.height }; };
@@ -198,5 +135,5 @@ const ART = (() => {
   const fxFrames = (name) => (META[name] ? META[name].frames : 1);
   const ui = (name) => IMG['ui/' + name];
 
-  return { mk, tint, drawTile, prop, house, charSprite, portrait, enemySprite, enemySize, icon, fx, fxFrames, ui, load, T, IMG };
+  return { mk, tint, drawTile, prop, house, charSprite, portrait, enemySprite, enemySize, icon, fx, fxFrames, ui, load, B, IMG };
 })();
