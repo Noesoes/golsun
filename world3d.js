@@ -38,7 +38,7 @@ async function load(onProgress) {
   const total = queue.length;
   async function fetchOne(key) {
     let err;
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt < 6; attempt++) {
       try { G[key] = await loader.loadAsync(`${A}${key}.glb${attempt ? '?r=' + attempt : ''}`); onProgress && onProgress(++done / total); return; }
       catch (e) { err = e; await new Promise((r) => setTimeout(r, 600 * (attempt + 1))); }
     }

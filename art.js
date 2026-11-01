@@ -16,13 +16,16 @@ const ART = (() => {
     ui: ['panel', 'panel_dark', 'faceframe', 'arrow'],
   };
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('missing ' + src)); i.src = src; }); }
+  // patchy mobile data: retry each file; if it still fails, carry on with a blank stand-in (these are only icons and effects)
+  async function retry(fn, tries = 4) { let err; for (let a = 0; a < tries; a++) { try { return await fn(a); } catch (e) { err = e; await new Promise((r) => setTimeout(r, 500 * (a + 1))); } } throw err; }
   async function load(onProgress) {
     const jobs = []; let done = 0, total = 0;
     for (const [dir, names] of Object.entries(FILES)) for (const n of names) {
       total++;
-      jobs.push(loadImg(`assets/${dir}/${n}.png`).then((im) => { IMG[dir + '/' + n] = im; if (onProgress) onProgress(++done / total); }));
+      const src = `assets/${dir}/${n}.png`;
+      jobs.push(retry((a) => loadImg(a ? `${src}?r=${a}` : src)).catch(() => mk(16, 16)[0]).then((im) => { IMG[dir + '/' + n] = im; if (onProgress) onProgress(++done / total); }));
     }
-    jobs.push(fetch('assets/meta.json').then((r) => r.json()).then((m) => (META = m)));
+    jobs.push(retry((a) => fetch(a ? `assets/meta.json?r=${a}` : 'assets/meta.json').then((r) => { if (!r.ok) throw new Error('meta'); return r.json(); })).then((m) => (META = m)).catch(() => (META = {})));
     await Promise.all(jobs);
   }
   function crop(key, x, y, w, h) {
@@ -30,7 +33,7 @@ const ART = (() => {
   }
   function portrait(look) { return window.W3D.portrait(look.sheet); }
   function icon(kind) { return IMG['icons/' + kind]; }
-  function fx(name, i) { const m = META[name]; return crop('fx/' + name, (i % m.frames) * m.w, 0, m.w, m.h); }
+  function fx(name, i) { const m = META[name] || { frames: 1, w: IMG['fx/' + name].width, h: IMG['fx/' + name].height }; return crop('fx/' + name, (i % m.frames) * m.w, 0, m.w, m.h); }
   const fxFrames = (name) => (META[name] ? META[name].frames : 1);
   const ui = (name) => IMG['ui/' + name];
 
