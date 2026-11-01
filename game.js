@@ -407,8 +407,8 @@ function drawUI() {
     box(4, by, dw, lines.length * 11 + 7); lines.forEach((l, i) => text(l, 10, by + 12 + i * 11));
   }
   if (UI.goldBox && state) {
-    box(W - 76, H - 22, 72, 18); img(ART.icon('gold'), W - 72, H - 20);
-    font(9, true); text(state.gold + '', W - 10, H - 9, COL.gold, 'right');
+    box(W - 76, 4, 72, 18); img(ART.icon('gold'), W - 72, 6);
+    font(9, true); text(state.gold + '', W - 10, 17, COL.gold, 'right');
   }
   drawDialog();
   if (UI.toast) {
@@ -441,6 +441,8 @@ function stats(m) {
   for (const k of ['hp', 'fp', 'atk', 'def', 'agi']) o[k] = Math.floor(h.base[k] + h.grow[k] * (m.lv - 1));
   if (m.weapon) o.atk += ITEMS[m.weapon].atk;
   if (m.armor) o.def += ITEMS[m.armor].def;
+  for (const slot of ['weapon', 'armor']) { const b = m[slot] && ITEMS[m[slot]].bonus; if (b) for (const k in b) o[k] += b[k]; }
+  if (m.up) { o.atk += (m.up.w || 0) * 3; o.def += (m.up.a || 0) * 2; }
   const t = trinketOf(m); if (t && t.bonus) for (const k in t.bonus) o[k] += t.bonus[k];
   return o;
 }
@@ -1350,7 +1352,7 @@ async function statusPage() {
       [['HP', `${m.hp} / ${s.hp}`], ['FP', `${m.fp} / ${s.fp}`], ['Attack', s.atk], ['Defense', s.def], ['Agility', s.agi]]
         .forEach(([k, v], r) => { text(k, 16, 96 + r * 13, COL.dim); text(String(v), 130, 96 + r * 13, COL.text, 'right'); });
       const t = trinketOf(m);
-      [['Weapon', m.weapon ? ITEMS[m.weapon].name : '—'], ['Armor', m.armor ? ITEMS[m.armor].name : '—'], ['Trinket', t ? t.name : '—'], ['Burst', BURSTS[HEROES[m.id].burst].name], ['Field tool', POWERS[HEROES[m.id].field].name]]
+      [['Weapon', (m.weapon ? ITEMS[m.weapon].name : '—') + (m.up && m.up.w ? ' +' + m.up.w : '')], ['Armor', (m.armor ? ITEMS[m.armor].name : '—') + (m.up && m.up.a ? ' +' + m.up.a : '')], ['Trinket', t ? t.name : '—'], ['Burst', BURSTS[HEROES[m.id].burst].name], ['Field tool', POWERS[HEROES[m.id].field].name]]
         .forEach(([k, v], r) => { text(k, 146, 96 + r * 13, COL.dim); text(String(v), W - 14, 96 + r * 13, COL.text, 'right'); });
       const hd = HEROES[m.id], py = 96 + 5 * 13 + 6;
       font(8, true); text(`Passive · ${hd.passive.name}`, 16, py, '#8a4ab0'); font(8); wrap(hd.passive.desc, W - 32).forEach((l, r) => text(l, 16, py + 11 + r * 10, COL.text));
@@ -1454,7 +1456,7 @@ async function settingsMenu() {
 }
 
 // ---------- shop & inn ----------
-function itemDesc(id) { const it = ITEMS[id]; if (it.slot === 'weapon') return `Weapon · Attack +${it.atk}`; if (it.slot === 'armor') return `Armor · Defense +${it.def}`; return it.desc; }
+function itemDesc(id) { const it = ITEMS[id]; if (it.slot === 'weapon') return `Weapon · Attack +${it.atk}${it.note ? ' · ' + it.note : ''}${it.cls ? ' · ' + CLASSES[it.cls].name + ' only' : ''}`; if (it.slot === 'armor') return `Armor · Defense +${it.def}`; return it.desc; }
 async function shopScript() {
   UI.goldBox = true;
   while (true) {
@@ -1490,6 +1492,58 @@ async function shopSell() {
     c = await choose(list.map((id) => ({ label: ITEMS[id].name, icon: ART.icon(ITEMS[id].icon), right: Math.floor(ITEMS[id].price / 2) + 'c', desc: `You have ${state.items[id]}.` })), { title: 'Sell', x: 76, y: 30, w: 168, cursor: Math.min(c, list.length - 1), max: 7 });
     if (c < 0) return;
     state.gold += Math.floor(ITEMS[list[c]].price / 2); removeItem(list[c]); sfx('chest');
+  }
+}
+// ---------- the smith ----------
+async function smithScript() {
+  const f = state.flags;
+  if (!f.metHollis) {
+    f.metHollis = true;
+    await say("Hm? Oh. You're the one dragging my apprentice off on an adventure, aren't you.", 'hollis');
+    await say("Hollis. I've kept this forge hot for thirty years. Bring me coin and I'll make your gear sing.", 'hollis');
+    if (state.party.some((m) => m.id === 'bram')) await say("Don't worry, Master Hollis. I'll keep my lantern lit and my hammer swinging.", 'bram');
+  } else await say(pick(["Back again? The coals are always hot.", "Steel doesn't lie. Let's see what you've got.", "Mind the sparks."]), 'hollis');
+  UI.goldBox = true;
+  let c = 0;
+  while (true) {
+    c = await choose([
+      { label: 'Hone a weapon', desc: '+3 attack per level, up to +3. Stays with the hero even if you change weapons.' },
+      { label: 'Reinforce armor', desc: '+2 defense per level, up to +3. Stays with the hero even if you change armor.' },
+      { label: 'Signature weapons', desc: 'A weapon forged for each class, with a bonus of its own.' },
+      { label: 'Leave' },
+    ], { x: 8, y: 30, w: 120, cursor: c });
+    if (c < 0 || c === 3) break;
+    if (c === 0 || c === 1) await smithUpgrade(c === 0 ? 'w' : 'a');
+    if (c === 2) await smithSignature();
+  }
+  UI.goldBox = false;
+  await say('Go on, then. Bring my apprentice back in one piece.', 'hollis');
+}
+async function smithUpgrade(k) {
+  const costs = k === 'w' ? HONE_COST : REINFORCE_COST, what = k === 'w' ? 'ATK' : 'DEF', per = k === 'w' ? 3 : 2;
+  while (true) {
+    const m = await chooseMember(k === 'w' ? 'Hone whose weapon?' : 'Reinforce whose armor?', (m) => { const lv = (m.up && m.up[k]) || 0; return lv >= 3 ? 'Maxed' : `+${lv} → +${lv + 1} · ${costs[lv]}c`; }, null, { x: 120, w: 160 });
+    if (!m) return;
+    m.up = m.up || {};
+    const lv = m.up[k] || 0;
+    if (lv >= 3) { toast(`${hname(m)}'s gear can't get any better.`); continue; }
+    if (state.gold < costs[lv]) { sfx('buzz'); toast(`That costs ${costs[lv]} coins.`); continue; }
+    state.gold -= costs[lv]; m.up[k] = lv + 1;
+    sfx('fire'); await sleep(250); sfx('thud'); await sleep(200); sfx('chest');
+    toast(`Clang! ${hname(m)}: ${what} +${per} (now +${lv + 1})`, 1800);
+  }
+}
+async function smithSignature() {
+  let c = 0;
+  while (true) {
+    const list = state.party.map((m) => SIGNATURE[HEROES[m.id].cls]);
+    c = await choose(list.map((id, i) => ({ label: ITEMS[id].name, icon: ART.icon('weapon'), right: state.party[i].weapon === id ? 'Owned' : ITEMS[id].price + 'c', desc: `For ${hname(state.party[i])}. ` + itemDesc(id),
+      disabled: state.party[i].weapon === id || ITEMS[id].price > state.gold })), { title: 'Signature weapons', x: 76, y: 30, w: 190, cursor: c });
+    if (c < 0) return;
+    const m = state.party[c], id = list[c], old = m.weapon;
+    state.gold -= ITEMS[id].price; m.weapon = id; sfx('fire'); await sleep(300); sfx('chest');
+    if (old) { const refund = Math.floor(ITEMS[old].price / 2); state.gold += refund; toast(`${hname(m)} wields the ${ITEMS[id].name}! Old weapon sold for ${refund}c.`, 2400); }
+    else toast(`${hname(m)} wields the ${ITEMS[id].name}!`, 2000);
   }
 }
 async function innScript() {

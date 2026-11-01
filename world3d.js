@@ -331,7 +331,10 @@ function buildMap(m, st) {
   const glows = [];
   for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
     const c = m.t[y][x], cx = x + 0.5, cz = y + 0.5, h = hash(x, y), h2 = hash(y + 17, x + 3), r = h2 * TAU;
-    if (c === 'T') {
+    if (c === 'T' && y >= m.h - 2) {
+      // the bottom edge sits between the camera and the player: low hedges instead of tall trees
+      if (y === m.h - 2 || (x + y) % 2) add('nature/Bush_Common_Flowers', { x: cx + (h2 - 0.5) * 0.3, z: cz, r, s: 1.1 + h * 0.4 });
+    } else if (c === 'T') {
       const deep = [[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => { const t = m.t[y + dy] && m.t[y + dy][x + dx]; return !t || t === 'T'; });
       if (deep && (x + 2 * y) % 3) continue;
       const k = h < 0.5 ? ['nature/CommonTree_3', 'nature/CommonTree_2', 'nature/CommonTree_4'][((h * 100) | 0) % 3] : 'nature/Pine_' + (1 + ((h * 100) | 0) % 3);
@@ -482,7 +485,7 @@ function rebuildDynamic(m, st) {
 // ------------------------------------------------------------------ actors
 const CAST = {
   wren: ['Ranger'], bram: ['Barbarian'], tamsin: ['Mage'], gran: ['Mage', 0xe0d0ff, 0.95], pell: ['Knight', 0xf0e0c0], rosa: ['Rogue', 0xffd0e0],
-  pip: ['Ranger', 0xfff0c0, 0.72], ivy: ['Rogue_Hooded', 0xd0c8ff], marta: ['Barbarian', 0xffe0c8, 0.95], dorrit: ['Knight', 0xd8c8a8], odo: ['Rogue_Hooded', 0xc8d8ff],
+  pip: ['Ranger', 0xfff0c0, 0.72], ivy: ['Rogue_Hooded', 0xd0c8ff], marta: ['Barbarian', 0xffe0c8, 0.95], hollis: ['Barbarian', 0xc8b8a8, 1.08], dorrit: ['Knight', 0xd8c8a8], odo: ['Rogue_Hooded', 0xc8d8ff],
 };
 // heroes look like their class (Warden = Knight, Druid = hooded...), tinted per character
 function castOf(who) {

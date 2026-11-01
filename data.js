@@ -143,6 +143,17 @@ const ITEMS = {
   chain: { name: 'Chain Vest', icon: 'armor', price: 180, slot: 'armor', def: 7 },
   moonweave: { name: 'Moonweave Coat', icon: 'armor', price: 420, slot: 'armor', def: 11 },
 };
+// Hollis's signature weapons: one per class, each with a little extra
+const SIGNATURE = { warden: 'bastion', berserker: 'cleaver', mage: 'emberstaff', rogue: 'galedaggers', ranger: 'longbow', druid: 'briarstaff' };
+Object.assign(ITEMS, {
+  bastion: { name: 'Bastion Mace', icon: 'weapon', price: 300, slot: 'weapon', atk: 10, cls: 'warden', bonus: { def: 4 }, note: 'DEF +4' },
+  cleaver: { name: 'Cinder Cleaver', icon: 'weapon', price: 300, slot: 'weapon', atk: 16, cls: 'berserker', note: 'the heaviest blade in the Vale' },
+  emberstaff: { name: 'Emberwood Staff', icon: 'weapon', price: 300, slot: 'weapon', atk: 8, cls: 'mage', bonus: { fp: 10 }, note: 'FP +10' },
+  galedaggers: { name: 'Galewhisper Daggers', icon: 'weapon', price: 300, slot: 'weapon', atk: 12, cls: 'rogue', bonus: { agi: 5 }, note: 'AGI +5' },
+  longbow: { name: 'Hawkeye Longbow', icon: 'weapon', price: 300, slot: 'weapon', atk: 13, cls: 'ranger', bonus: { agi: 3 }, note: 'AGI +3' },
+  briarstaff: { name: 'Briarheart Staff', icon: 'weapon', price: 300, slot: 'weapon', atk: 9, cls: 'druid', bonus: { hp: 16 }, note: 'HP +16' },
+});
+const HONE_COST = [60, 140, 260], REINFORCE_COST = [50, 120, 220];
 const SHOP_LIST = ['herb', 'tea', 'salts', 'tinblade', 'quilted', 'steelblade', 'chain', 'starsteel', 'moonweave'];
 
 const ENEMIES = {
@@ -181,6 +192,7 @@ const PEOPLE = {
   marta: { name: 'Marta', look: { sheet: 'marta' } },
   dorrit: { name: 'Dorrit', look: { sheet: 'dorrit' } },
   odo: { name: 'Odo', look: { sheet: 'odo' } },
+  hollis: { name: 'Hollis', look: { sheet: 'hollis' } },
 };
 
 // ---------- maps ----------
@@ -227,13 +239,14 @@ const MAPS = {
       { x: 29, y: 12, to: 'field', tx: 1, ty: 11, dir: 'right' },
     ],
     houses: [{ x: 3, y: 3, w: 5, h: 4, kind: 'cottage', door: 5 }, { x: 19, y: 3, w: 5, h: 5, kind: 'inn', door: 21 }, { x: 4, y: 15, w: 3, h: 4, kind: 'shop', door: 5 }, { x: 12, y: 16, w: 7, h: 4, kind: 'market' },
-      { x: 21, y: 16, w: 5, h: 5, kind: 'forge', door: 22, locked: "Bram's forge. The coals are banked low; nobody is working the anvil today." },
+      { x: 21, y: 16, w: 5, h: 5, kind: 'forge', door: 22, locked: "The forge door is shut to keep the heat in. Hollis the smith is out by the anvil." },
       { x: 24, y: 8, w: 4, h: 3, kind: 'mill', door: 26, locked: "The mill door is shut tight. A note on it reads: 'Gone to look at the gray flowers. Back soon! — Dorrit'" }],
     signs: { '27,11': 'East: Windmere Fields.\nBeyond them, in the cliffs: Whisper Grotto.' },
     trinkets: [{ id: 'foxbell', x: 26, y: 22 }],
     npcs: [
       { id: 'bram_v', x: 13, y: 13, who: 'bram', dir: 'left', cond: () => !state.flags.metGran && !state.flags.bramJoined,
         talk: async () => { await say("Gran's cottage is the red-roofed one up the path to the northwest. I'll meet you there!", 'bram'); } },
+      { id: 'hollis', x: 24, y: 21, who: 'hollis', dir: 'down', talk: async () => smithScript() },
       { id: 'pell1', x: 28, y: 12, who: 'pell', dir: 'left', cond: () => !state.flags.metGran,
         talk: async () => { await say("Morning, Wren! Your gran was asking after you. Best go see her before you wander off. Her cottage is the red-roofed one to the northwest.", 'pell'); } },
       { id: 'pell2', x: 27, y: 13, who: 'pell', dir: 'left', cond: () => !!state.flags.metGran,
