@@ -1345,11 +1345,13 @@ async function settingsMenu() {
       { label: 'Music', right: settings.music ? 'On' : 'Off' },
       { label: 'Sound effects', right: settings.sfx ? 'On' : 'Off' },
       { label: 'Text speed', right: ['Normal', 'Fast', 'Instant'][settings.text] },
+      { label: 'Graphics', right: settings.gfx === 'low' ? 'Fast' : 'Fancy' },
     ], { title: 'Settings', x: 64, y: 50, w: 160, cursor: c });
     if (c < 0) return;
     if (c === 0) settings.music = !settings.music;
     if (c === 1) settings.sfx = !settings.sfx;
     if (c === 2) settings.text = (settings.text + 1) % 3;
+    if (c === 3) { settings.gfx = settings.gfx === 'low' ? 'high' : 'low'; settings.gfxAuto = false; W3D.setQuality(settings.gfx); }
     applyAudio(); saveSettings();
   }
 }
@@ -1563,7 +1565,9 @@ let loadP = 0, loadErr = null;
   preloadMusic();
   try {
     await window.W3DReady;
-    W3D.init(document.getElementById('gl'));
+    W3D.init(document.getElementById('gl'), settings.gfx || 'high');
+    // if the phone can't keep up with the fancy effects, drop to the fast mode once (the player can switch back in Settings)
+    if (settings.gfxAuto !== false && !settings.gfx) W3D.onSlow = () => { settings.gfx = 'low'; saveSettings(); W3D.setQuality('low'); toast('Graphics set to Fast for smoother play (see Settings)'); };
     let p2 = 0, p3 = 0;
     await Promise.all([ART.load((p) => (p2 = p, loadP = p2 * 0.15 + p3 * 0.85)), W3D.load((p) => (p3 = p, loadP = p2 * 0.15 + p3 * 0.85)), Promise.race([document.fonts.load('10px Pixelify'), sleep(1500)])]);
     W3D.ready = true;

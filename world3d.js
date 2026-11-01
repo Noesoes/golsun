@@ -40,6 +40,7 @@ async function load(onProgress) {
   await Promise.all(jobs);
   for (const k of ['chars/Rig_Medium_General', 'chars/Rig_Medium_MovementBasic']) for (const c of G[k].animations) CLIPS[c.name] = c;
   for (const g of Object.values(G)) g.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material && o.material.map) o.material.map.anisotropy = 4; } });
+  setupWind();
 }
 
 // ------------------------------------------------------------------ templates & instancing
@@ -137,11 +138,12 @@ let mapInfo = null;    // { id, def, w, h, chars, glows }
 const actors = new Map(); // id -> { obj, mixer, actions, cur, rot }
 let water = null, falls = [];
 
-function init(canvas) {
-  glCanvas = canvas;
+function init(canvas, quality) {
+  glCanvas = canvas; FX.quality = quality === 'low' ? 'low' : 'high';
   try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' }); }
   catch (e) { throw new Error('3D graphics (WebGL) are not available in this browser.'); }
-  renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
+  renderer.setPixelRatio(FX.quality === 'low' ? 1 : Math.min(1.5, window.devicePixelRatio || 1));
+  if (FX.quality === 'high') { try { FX.post = new Post(renderer); } catch (e) { FX.post = null; } }
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -150,7 +152,9 @@ function init(canvas) {
 function resize(cssW, cssH, lw, lh) {
   LW = lw; LH = lh;
   if (!renderer) return;
+  pxW = cssW; pxH = cssH;
   renderer.setSize(cssW, cssH, false);
+  if (FX.post) { const v = renderer.getDrawingBufferSize(new THREE.Vector2()); FX.post.setSize(v.x, v.y); }
   glCanvas.style.width = cssW + 'px'; glCanvas.style.height = cssH + 'px';
   camera.aspect = lw / lh; camera.updateProjectionMatrix();
   battleCam.aspect = lw / lh; battleCam.updateProjectionMatrix();
@@ -164,7 +168,7 @@ function dispose(group) {
 
 // ------------------------------------------------------------------ map building
 const WATERISH = new Set(['~', '%', 'o', '|']);
-const WALLS = { M: 1.7, '#': 2.4, Q: 2.4 };
+const WALLS = { M: 1.7, '#': 1.15, Q: 2.4 };
 function groundColor(c, x, y, def) {
   const v = hash(x, y);
   if (def.ground === 'W') return c === 'g' ? 0xb07a4a : 0xb38050;
@@ -204,7 +208,7 @@ function buildGround(m, def) {
 }
 const CLIFF_H = 2.6;
 function buildWalls(m, def) {
-  const T = { P: [], C: [] }, S = { P: [], C: [] }, col = new THREE.Color();
+  const T = { P: [], C: [] }, S = { P: [], C: [] }, V = { P: [], C: [] }, col = new THREE.Color();
   const wallAt = (c) => c in WALLS || c === 'v';
   const isWall = (x, y) => { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return true; return wallAt(m.t[y][x]); };
   const jit = (x, y, amp) => (hash(x * 7 + 3, y * 11 + 5) - 0.5) * amp;
@@ -217,8 +221,8 @@ function buildWalls(m, def) {
     const amp = interior ? 0 : 0.35, xa = interior ? 0 : 0.12;
     const corner = (cx, cy) => [cx + jit(cx + 50, cy, xa), Hh + jit(cx, cy, amp), cy + jit(cx, cy + 50, xa)];
     const tl = corner(x, y), tr = corner(x + 1, y), bl = corner(x, y + 1), br = corner(x + 1, y + 1);
-    const topC = cave ? [0.2, 0.17, 0.24] : interior ? [0.36, 0.24, 0.16] : (col.setHex(hash(x, y) < 0.5 ? 0x5e9a40 : 0x6aa646), [col.r, col.g, col.b]);
-    quad(interior || cave ? S : T, tl, bl, br, tr, topC, topC); // counter-clockwise from above, so the top faces up
+    const topC = cave ? [0.09, 0.07, 0.12] : interior ? [0.36, 0.24, 0.16] : (col.setHex(hash(x, y) < 0.5 ? 0x5e9a40 : 0x6aa646), [col.r, col.g, col.b]);
+    quad(cave ? V : interior ? S : T, tl, bl, br, tr, topC, topC); // counter-clockwise from above, so the top faces up
     const sideTop = cave ? [0.55, 0.48, 0.6] : interior ? [0.93, 0.88, 0.76] : [0.95, 0.86, 0.72];
     const sideBot = cave ? [0.26, 0.22, 0.3] : interior ? [0.55, 0.38, 0.24] : [0.55, 0.46, 0.38];
     const down = (p) => [p[0], -0.6, p[2]];
@@ -245,6 +249,10 @@ function buildWalls(m, def) {
   };
   const outdoor = !!def.outdoor;
   mk(T, TEX.ground, false);
+  if (V.P.length) { // cave ceilings: unlit darkness, the classic cut-away look
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(V.P, 3));
+    const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x0b0910 })); mesh.userData.own = true; grp.add(mesh);
+  }
   mk(S, outdoor ? TEX.rock : TEX.ground, outdoor);
   return grp.children.length ? grp : null;
 }
@@ -305,9 +313,7 @@ function buildMap(m, st) {
   water = null; falls = [];
   let wet = false; for (const r of m.t) for (const c of r) if (WATERISH.has(c)) wet = true;
   if (wet) {
-    const wm = new THREE.MeshStandardMaterial({ color: cave ? 0x2a5a8a : 0x5ab0e0, map: TEX.water, transparent: true, opacity: cave ? 0.9 : 0.82, roughness: 0.15, metalness: 0.1, emissive: cave ? 0x0a2040 : 0x000000 });
-    water = new THREE.Mesh(new THREE.PlaneGeometry(m.w, m.h), wm); water.rotation.x = -Math.PI / 2; water.position.set(m.w / 2, -0.12, m.h / 2);
-    water.material.map = TEX.water.clone(); water.material.map.repeat.set(m.w / 3, m.h / 3); water.material.map.needsUpdate = true;
+    water = new THREE.Mesh(new THREE.PlaneGeometry(m.w, m.h), waterMaterial(m, cave)); water.rotation.x = -Math.PI / 2; water.position.set(m.w / 2, -0.12, m.h / 2);
     water.userData.own = true; water.receiveShadow = true; world.add(water);
   }
   const L = {}; const add = (k, it) => { const ck = k + '|' + Math.floor(it.x / 8) + ',' + Math.floor(it.z / 8); (L[ck] = L[ck] || []).push(it); };
@@ -362,8 +368,8 @@ function buildMap(m, st) {
     }
     if (cave && c === '#') {
       const edge = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dy]) => { const t = m.t[y + dy] && m.t[y + dy][x + dx]; return t && t !== '#'; });
-      if (edge) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + edge[0] * 0.3, y: -0.3, z: cz + edge[1] * 0.3, r, s: 2.4 + h2 * 1.2 });
-      else if (h < 0.25) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx, y: 2.0, z: cz, r, s: 1.8 });
+      if (edge) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + edge[0] * 0.3, y: -0.2, z: cz + edge[1] * 0.3, r, s: 1.5 + h2 * 0.7 });
+      else if (h < 0.6) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + (h2 - 0.5) * 0.5, y: 0.75, z: cz, r, s: 1.1 + h2 * 0.8 });
     }
     if (cave && c === '_' && h < 0.14) add('nature/Pebble_Round_' + (h2 < 0.5 ? 1 : 3), { x: cx, z: cz, r, s: 1 });
     if (outdoor && c === 'M') {
@@ -536,7 +542,7 @@ function syncMap(dt, S) {
   } else if (dynGroup.userData.slide) { dynGroup.userData.slide.removeFromParent(); dynGroup.userData.slide = null; }
   dynGroup.traverse((o) => { if (o.userData.mixer) o.userData.mixer.update(dt / 1000); if (o.userData.spin) { o.rotation.y += dt / 600; o.position.y = 0.25 + Math.sin(T / 300) * 0.08; } });
   // water / falls
-  if (water) { water.material.map.offset.x = (T / 9000) % 1; water.material.map.offset.y = (T / 14000) % 1; }
+
   for (const f of falls) f.material.map.offset.y = (T / 700) % 1;
   // camera
   const interior = mapInfo.interior;
@@ -593,7 +599,7 @@ function buildArena(kind) {
     instances(arena, 'nature/Grass_Common_Short', 0.3, 'h', grass, { cast: false });
     instances(arena, 'nature/Flower_4_Group', 0.5, 'h', flowers, { cast: false });
     instances(arena, 'nature/Bush_Common_Flowers', 1.0, 'w', [{ x: -5.5, z: 1 }, { x: 6, z: 2.4 }, { x: -2, z: -4.5 }], {});
-    battleScene.background = new THREE.Color(0xa8d8f0); battleScene.fog = new THREE.Fog(0xa8d8f0, 14, 32);
+    battleScene.background = new THREE.Color(0x9cc8e8); battleScene.fog = new THREE.Fog(0x9cc8e8, 18, 40);
     bHemi.color.set(0xd8ecff); bHemi.groundColor.set(0x5a6a3a); bHemi.intensity = 1.2; bSun.color.set(0xfff0d8); bSun.intensity = 2.4; bGlow.intensity = 0;
   } else {
     instances(arena, 'nature/Rock_Medium_1', 2.4, 'w', rocks.filter((_, i) => i % 2), { tint: 0x8a80a0 });
@@ -703,11 +709,156 @@ function portrait(who) {
   return small;
 }
 
+
+// ------------------------------------------------------------------ polish: wind, water, post-processing
+const FX = { time: { value: 0 }, quality: 'high', post: null };
+// sway foliage in the wind: vertices move more the higher they are above the plant's base
+function addWind(mat, k) {
+  if (mat.userData.wind) return; mat.userData.wind = k;
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = FX.time;
+    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+      vec4 wPos = vec4( transformed, 1.0 );
+      #ifdef USE_INSTANCING
+        wPos = instanceMatrix * wPos;
+        float wBase = ( modelMatrix * instanceMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ) ).y;
+      #else
+        float wBase = ( modelMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ) ).y;
+      #endif
+      wPos = modelMatrix * wPos;
+      float wH = max( 0.0, wPos.y - wBase );
+      float ph = uTime * 1.7 + wPos.x * 0.35 + wPos.z * 0.27;
+      float gust = 0.65 + 0.35 * sin( uTime * 0.45 + wPos.x * 0.08 );
+      wPos.xz += vec2( sin( ph ), cos( ph * 0.83 ) * 0.5 ) * wH * ${k.toFixed(3)} * gust;
+      vec4 mvPosition = viewMatrix * wPos;
+      gl_Position = projectionMatrix * mvPosition;`);
+  };
+  mat.customProgramCacheKey = () => 'wind' + k;
+}
+const WIND = [[/^nature\/(CommonTree|Pine|TwistedTree|DeadTree)/, 0.035], [/^nature\/Bush/, 0.06], [/^nature\/(Grass|Flower|Fern|Clover|Plant)/, 0.22]];
+function setupWind() {
+  for (const [key, g] of Object.entries(G)) {
+    const w = WIND.find(([re]) => re.test(key)); if (!w) continue;
+    g.scene.traverse((o) => { if (o.isMesh && !/bark|trunk|wood/i.test(o.material.name || '')) addWind(o.material, w[1]); });
+  }
+}
+// rivers and ponds: depth colour, shoreline foam, ripples and glints
+function shoreTexture(m) {
+  const R = 8, w = m.w * R, h = m.h * R; let a = new Float32Array(w * h), b = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) a[y * w + x] = WATERISH.has(m.t[(y / R) | 0][(x / R) | 0]) ? 0 : 1;
+  const blur = (src, dst, dx, dy, r) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, n = 0; for (let k = -r; k <= r; k++) { const xx = x + k * dx, yy = y + k * dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) { s += 1; n++; continue; } s += src[yy * w + xx]; n++; } dst[y * w + x] = s / n; } };
+  for (let i = 0; i < 2; i++) { blur(a, b, 1, 0, 5); blur(b, a, 0, 1, 5); }
+  const d = new Uint8Array(w * h * 4); for (let i = 0; i < w * h; i++) { const v = Math.min(255, a[i] * 255) | 0; d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; }
+  const t = new THREE.DataTexture(d, w, h); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return t;
+}
+function waterMaterial(m, cave) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, roughness: 0.12, metalness: 0.05, emissive: cave ? 0x0a2a48 : 0x000000 });
+  const shore = shoreTexture(m);
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uTime: FX.time, uShore: { value: shore }, uSize: { value: new THREE.Vector2(m.w, m.h) },
+      uDeep: { value: new THREE.Color(cave ? 0x0e3a6a : 0x1f6fa8) }, uShallow: { value: new THREE.Color(cave ? 0x3aa8c8 : 0x6fd6e0) } });
+    sh.vertexShader = 'varying vec3 vWPos;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vWPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
+    sh.fragmentShader = 'varying vec3 vWPos; uniform float uTime; uniform sampler2D uShore; uniform vec2 uSize; uniform vec3 uDeep, uShallow;\nfloat wN1, wN2, wFoam;\n' + sh.fragmentShader
+      .replace('#include <map_fragment>', `
+        float shore = texture2D( uShore, vWPos.xz / uSize ).r;
+        wN1 = sin( vWPos.x * 2.1 + uTime * 1.3 ) * sin( vWPos.z * 1.7 - uTime * 1.1 );
+        wN2 = sin( vWPos.x * 3.7 - uTime * 1.7 + vWPos.z * 2.3 ) * sin( vWPos.z * 2.9 + uTime * 0.9 );
+        diffuseColor.rgb = mix( uDeep, uShallow, clamp( shore * 1.5 + wN1 * 0.06, 0.0, 1.0 ) );
+        float streak = smoothstep( 0.9, 1.0, sin( vWPos.x * 1.1 + vWPos.z * 3.6 + uTime * 0.9 + wN1 * 2.0 ) );
+        diffuseColor.rgb += streak * 0.07;
+        float fs = shore + wN2 * 0.03 + sin( uTime * 1.6 + shore * 20.0 ) * 0.02;
+        wFoam = smoothstep( 0.33, 0.40, fs ) * ( 1.0 - smoothstep( 0.44, 0.52, fs ) );
+        diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.95, 0.98, 1.0 ), wFoam * 0.75 );
+        diffuseColor.a = mix( 0.85, 0.95, wFoam ) * ( 1.0 - smoothstep( 0.45, 0.6, shore ) * 0.85 );`)
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize( normal + vec3( wN1, 0.0, wN2 ) * 0.16 * ( 1.0 - wFoam ) );');
+  };
+  mat.customProgramCacheKey = () => 'water' + (cave ? 1 : 0);
+  return mat;
+}
+// full-screen effects: soft glow on bright things, tilt-shift depth blur, colour grading, vignette
+class Post {
+  constructor(r) {
+    this.r = r;
+    const ext = r.extensions, hdr = ext.has('EXT_color_buffer_half_float') || ext.has('EXT_color_buffer_float');
+    const opt = { type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType, colorSpace: THREE.LinearSRGBColorSpace };
+    this.main = new THREE.WebGLRenderTarget(4, 4, { ...opt, samples: 4 });
+    this.a = new THREE.WebGLRenderTarget(4, 4, opt); this.b = new THREE.WebGLRenderTarget(4, 4, opt);
+    this.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const tri = new THREE.BufferGeometry(); tri.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3)); tri.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 2, 0, 0, 2], 2));
+    this.quad = new THREE.Mesh(tri); this.quad.frustumCulled = false; this.sc = new THREE.Scene(); this.sc.add(this.quad);
+    const vs = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+    this.down = new THREE.ShaderMaterial({ uniforms: { t: { value: null }, px: { value: new THREE.Vector2() } }, vertexShader: vs,
+      fragmentShader: 'uniform sampler2D t; uniform vec2 px; varying vec2 vUv; void main(){ vec3 c = texture2D(t, vUv + px * vec2(-1.0,-1.0)).rgb + texture2D(t, vUv + px * vec2(1.0,-1.0)).rgb + texture2D(t, vUv + px * vec2(-1.0,1.0)).rgb + texture2D(t, vUv + px * vec2(1.0,1.0)).rgb; gl_FragColor = vec4(min(c * 0.25, vec3(8.0)), 1.0); }' });
+    this.blur = new THREE.ShaderMaterial({ uniforms: { t: { value: null }, dir: { value: new THREE.Vector2() } }, vertexShader: vs,
+      fragmentShader: 'uniform sampler2D t; uniform vec2 dir; varying vec2 vUv; void main(){ vec3 c = texture2D(t, vUv).rgb * 0.227; c += (texture2D(t, vUv + dir * 1.3846).rgb + texture2D(t, vUv - dir * 1.3846).rgb) * 0.316; c += (texture2D(t, vUv + dir * 3.2308).rgb + texture2D(t, vUv - dir * 3.2308).rgb) * 0.070; gl_FragColor = vec4(c, 1.0); }' });
+    this.comp = new THREE.ShaderMaterial({ uniforms: { tS: { value: null }, tB: { value: null }, exposure: { value: 1.05 }, bloom: { value: 0.55 }, thr: { value: 0.75 }, tilt: { value: 0.85 }, sat: { value: 1.12 }, vig: { value: 0.32 } }, vertexShader: vs,
+      fragmentShader: `uniform sampler2D tS, tB; uniform float exposure, bloom, thr, tilt, sat, vig; varying vec2 vUv;
+        vec3 fit(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
+        vec3 aces(vec3 c){ const mat3 I = mat3(vec3(0.59719,0.07600,0.02840), vec3(0.35458,0.90834,0.13383), vec3(0.04823,0.01566,0.83777)); const mat3 O = mat3(vec3(1.60475,-0.10208,-0.00327), vec3(-0.53108,1.10813,-0.07276), vec3(-0.07367,-0.00605,1.07602)); c *= exposure / 0.6; return clamp(O * fit(I * c), 0.0, 1.0); }
+        vec3 srgb(vec3 c){ return mix(pow(c, vec3(0.41666)) * 1.055 - 0.055, c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308)))); }
+        void main(){
+          vec3 c = texture2D(tS, vUv).rgb, b = texture2D(tB, vUv).rgb;
+          float d = smoothstep(0.26, 0.55, abs(vUv.y - 0.5)) * tilt;
+          c = mix(c, b, d);
+          c += max(b - thr, 0.0) * bloom;
+          c = aces(c);
+          float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+          c = mix(vec3(l), c, sat);
+          c = c * vec3(1.03, 1.0, 0.95) + vec3(0.0, 0.004, 0.02) * (1.0 - l);
+          c = srgb(clamp(c, 0.0, 1.0));
+          vec2 q = vUv - 0.5; c *= 1.0 - vig * dot(q, q) * 2.2;
+          gl_FragColor = vec4(c, 1.0);
+        }` });
+  }
+  setSize(w, h) { this.main.setSize(w, h); const qw = Math.max(1, w >> 2), qh = Math.max(1, h >> 2); this.a.setSize(qw, qh); this.b.setSize(qw, qh); this.w = w; this.h = h; this.qw = qw; this.qh = qh; }
+  pass(mat, target) { this.quad.material = mat; this.r.setRenderTarget(target); this.r.render(this.sc, this.cam); }
+  render(scene, cam, kind) {
+    const r = this.r; const bloomBoost = kind === 'cave' ? 1.6 : 1;
+    r.setRenderTarget(this.main); r.render(scene, cam);
+    this.down.uniforms.t.value = this.main.texture; this.down.uniforms.px.value.set(1.5 / this.w, 1.5 / this.h); this.pass(this.down, this.a);
+    for (let i = 0; i < 2; i++) {
+      this.blur.uniforms.t.value = this.a.texture; this.blur.uniforms.dir.value.set((1 + i) / this.qw, 0); this.pass(this.blur, this.b);
+      this.blur.uniforms.t.value = this.b.texture; this.blur.uniforms.dir.value.set(0, (1 + i) / this.qh); this.pass(this.blur, this.a);
+    }
+    const u = this.comp.uniforms; u.tS.value = this.main.texture; u.tB.value = this.a.texture; u.bloom.value = (kind === 'battle' ? 0.3 : 0.5) * bloomBoost; u.thr.value = kind === 'cave' ? 0.35 : kind === 'battle' ? 1.0 : 0.8;
+    u.tilt.value = kind === 'battle' ? 0.4 : kind === 'interior' ? 0.3 : 0.6;
+    u.exposure.value = renderer.toneMappingExposure;
+    this.pass(this.comp, null);
+  }
+}
+let pxW = 0, pxH = 0;
+function setQuality(q) {
+  FX.quality = q === 'low' ? 'low' : 'high';
+  if (!renderer) return;
+  const pr = FX.quality === 'low' ? 1 : Math.min(1.5, window.devicePixelRatio || 1);
+  renderer.setPixelRatio(pr);
+  if (FX.quality === 'high' && !FX.post) { try { FX.post = new Post(renderer); } catch (e) { FX.post = null; } }
+  if (pxW) resize(pxW, pxH, LW, LH);
+}
+// watch the frame rate for a few seconds of play; if it's poor in the fancy mode, tell the game once
+const perf = { t0: 0, n: 0, last: 0, done: false };
+function watchPerf(now) {
+  if (perf.done || FX.quality !== 'high' || !W3D.onSlow) return;
+  if (!perf.last || now - perf.last > 500) { perf.last = now; perf.t0 = now + 3000; perf.n = 0; return; } // paused / hidden: restart (skip 3 s of warm-up)
+  if (now < perf.t0) { perf.last = now; return; }
+  perf.last = now; perf.n++;
+  if (now - perf.t0 > 5000) {
+    const fps = perf.n * 1000 / (now - perf.t0);
+    perf.done = true;
+    if (fps < 26) W3D.onSlow();
+  }
+}
+
 // ------------------------------------------------------------------ public API
 function render(kind) {
   if (!renderer) return;
-  if (kind === 'battle') renderer.render(battleScene, battleCam);
-  else renderer.render(scene, camera);
+  const now = performance.now(); FX.time.value = now / 1000;
+  const sc = kind === 'battle' ? battleScene : scene, cam = kind === 'battle' ? battleCam : camera;
+  if (FX.quality === 'high' && FX.post) {
+    const k = kind === 'battle' ? (arenaKind === 'field' ? 'battle' : 'cave') : mapInfo && mapInfo.cave ? 'cave' : mapInfo && mapInfo.interior ? 'interior' : 'field';
+    FX.post.render(sc, cam, k);
+  } else renderer.render(sc, cam);
+  if (kind === 'battle' || (mapInfo && kind === 'map')) watchPerf(now);
 }
 function pickTile(lx, ly) {
   const p = screenToGround(camera, lx, ly);
@@ -718,5 +869,5 @@ function toScreen(wx, wy, wz) { return project(camera, wx, wy, wz); }
 function tileChanged(m, st) { if (mapInfo && m.id === mapInfo.id) { rebuildDynamic(m, st); setCaveLight(st); } }
 function hideActors() { for (const a of actors.values()) a.obj.visible = false; }
 
-window.W3D = { init, load, resize, buildMap, syncMap, render, pickTile, toScreen, tileChanged, resetCamera, battleStart, battleSync, battleEnd, enemyScreen, titleSync, portrait, hideActors, setCaveLight, ENEMY_MODEL };
+window.W3D = { setQuality, init, load, resize, buildMap, syncMap, render, pickTile, toScreen, tileChanged, resetCamera, battleStart, battleSync, battleEnd, enemyScreen, titleSync, portrait, hideActors, setCaveLight, ENEMY_MODEL };
 window.__w3dReady && window.__w3dReady();
