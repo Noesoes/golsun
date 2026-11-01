@@ -226,7 +226,9 @@ const MAPS = {
       { x: 5, y: 18, to: 'shop', tx: 4, ty: 6, dir: 'up' },
       { x: 29, y: 12, to: 'field', tx: 1, ty: 11, dir: 'right' },
     ],
-    houses: [{ x: 3, y: 3, w: 5, h: 4, kind: 'cottage' }, { x: 19, y: 3, w: 5, h: 5, kind: 'inn' }, { x: 4, y: 15, w: 3, h: 4, kind: 'shop' }, { x: 12, y: 16, w: 7, h: 4, kind: 'market' }, { x: 21, y: 16, w: 5, h: 5, kind: 'forge' }, { x: 24, y: 8, w: 4, h: 3, kind: 'mill' }],
+    houses: [{ x: 3, y: 3, w: 5, h: 4, kind: 'cottage', door: 5 }, { x: 19, y: 3, w: 5, h: 5, kind: 'inn', door: 21 }, { x: 4, y: 15, w: 3, h: 4, kind: 'shop', door: 5 }, { x: 12, y: 16, w: 7, h: 4, kind: 'market' },
+      { x: 21, y: 16, w: 5, h: 5, kind: 'forge', door: 22, locked: "Bram's forge. The coals are banked low; nobody is working the anvil today." },
+      { x: 24, y: 8, w: 4, h: 3, kind: 'mill', door: 26, locked: "The mill door is shut tight. A note on it reads: 'Gone to look at the gray flowers. Back soon! — Dorrit'" }],
     signs: { '27,11': 'East: Windmere Fields.\nBeyond them, in the cliffs: Whisper Grotto.' },
     trinkets: [{ id: 'foxbell', x: 26, y: 22 }],
     npcs: [

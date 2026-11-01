@@ -300,6 +300,9 @@ function bridge() {
   for (let i = 0; i < 5; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.08, 1.15), mat); p.position.set(-0.4 + i * 0.2, 0.04, 0); p.castShadow = p.receiveShadow = true; p.userData.own = true; g.add(p); }
   return g;
 }
+// where each model's front door is, measured from its centre (in model widths of DOOR_W tiles)
+const DOOR_DX = { cottage: -0.02, inn: -0.46, shop: 0.37, forge: -1.4, mill: 0 };
+const DOOR_W = { cottage: 5, inn: 5, shop: 3, forge: 5, mill: 4 };
 function building(kind, fw, fh) {
   const map = { cottage: 'home_A_red', inn: 'tavern_blue', shop: 'home_B_yellow', market: 'market_green', forge: 'blacksmith_red', mill: 'windmill_yellow' };
   const o = place('bld/' + map[kind], fw * 0.98, 'w');
@@ -395,21 +398,28 @@ function buildMap(m, st) {
   for (const [ck, items] of Object.entries(L)) { const k = ck.split('|')[0]; const [sz, mode] = sizeOf(k); const caveRock = cave && k.includes('Rock_Medium'); instances(world, k, sz, mode, items, { tint: caveRock ? 0x8a7aa8 : null, cast: !k.includes('Grass') && !k.includes('Clover') && !k.includes('Pebble') && !k.includes('Flower') }); }
   // buildings: collision follows the real model, not the rectangle reserved for it on the map
   const open = new Set(), rc = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), org = new THREE.Vector3();
+  const closed = new Set();
   for (const hs of def.houses || []) {
-    const o = building(hs.kind, hs.w, hs.h); o.position.set(hs.x + hs.w / 2, 0, hs.y + hs.h / 2 + 0.1); world.add(o);
+    const o = building(hs.kind, hs.w, hs.h);
+    // slide the model sideways so its front door sits exactly on the door tile
+    const cx = hs.door != null ? hs.door + 0.5 - (DOOR_DX[hs.kind] || 0) * hs.w / DOOR_W[hs.kind] : hs.x + hs.w / 2;
+    o.position.set(cx, 0, hs.y + hs.h / 2 + 0.1); world.add(o);
     o.updateMatrixWorld(true);
-    for (let y = hs.y; y < hs.y + hs.h; y++) for (let x = hs.x; x < hs.x + hs.w; x++) {
-      if (m.t[y][x] === 'D') continue;
+    for (let y = hs.y - 1; y <= hs.y + hs.h; y++) for (let x = hs.x - 1; x <= hs.x + hs.w; x++) {
+      if (y < 0 || x < 0 || y >= m.h || x >= m.w) continue;
+      const inside = x >= hs.x && x < hs.x + hs.w && y >= hs.y && y < hs.y + hs.h, t = m.t[y][x];
+      if (t === 'D' || (hs.door === x && y === hs.y + hs.h - 1)) continue;
       let hit = 0;
       for (const [sx, sz] of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
         org.set(x + sx, 12, y + sz); rc.set(org, down);
         const h = rc.intersectObject(o, true)[0];
         if (h && h.point.y > 0.45) hit++;
       }
-      if (hit < 3) open.add(x + ',' + y); // mostly empty ground: walkable
+      if (inside && hit < 3) open.add(x + ',' + y); // mostly empty ground: walkable
+      if (!inside && hit >= 3) closed.add(x + ',' + y); // the model overhangs this tile: solid
     }
   }
-  W3D.openTiles = open;
+  W3D.openTiles = open; W3D.closedTiles = closed;
   // atmosphere
   if (outdoor) { scene.background = new THREE.Color(0xa8d8f0); scene.fog = new THREE.Fog(0xa8d8f0, 20, 42); hemi.intensity = 1.25; sun.intensity = 2.4; hemi.color.set(0xd8ecff); hemi.groundColor.set(0x5a6a3a); }
   else if (interior) { scene.background = new THREE.Color(0x1a1410); scene.fog = null; hemi.intensity = 1.1; sun.intensity = 1.4; hemi.color.set(0xfff0d8); hemi.groundColor.set(0x6a4a30); }

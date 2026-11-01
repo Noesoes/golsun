@@ -522,6 +522,7 @@ function pickupAt(x, y) { return (cur.def.trinkets || []).find((w) => w.x === x 
 function blocked(x, y, self) {
   const tc = tileAt(x, y);
   if (SOLID.has(tc) && !((tc === 'H' || tc === 'R') && W3D.openTiles && W3D.openTiles.has(x + ',' + y))) return true;
+  if (W3D.closedTiles && W3D.closedTiles.has(x + ',' + y)) return true;
   if (cur.npcs.some((n) => n !== self && ((n.x === x && n.y === y) || (n.moving && n.fx === x && n.fy === y)))) return true;
   if (pickupAt(x, y)) return true;
   if (self && ((P.x === x && P.y === y) || (P.moving && P.fx === x && P.fy === y))) return true;
@@ -656,7 +657,9 @@ function facingTarget() {
   if (!n && c === 'K') { n = npcAt(x + dx, y + dy); if (n) return { kind: 'talk', n, x: x + dx, y: y + dy }; }
   if (n) return { kind: 'talk', n, x, y };
   if (pickupAt(x, y)) return { kind: 'take', x, y };
-  if (c === 'C') return { kind: 'open', x, y };
+  const door = (cur.def.houses || []).find((h) => h.locked && h.door === x && h.y + h.h - 1 === y);
+  if (door) return { kind: 'locked', x, y, msg: door.locked };
+    if (c === 'C') return { kind: 'open', x, y };
   if (c === 'J') return hasPower('pick') ? { kind: 'power', p: 'pick', x, y } : { kind: 'look', x, y };
   if (c === 'S') return { kind: 'read', x, y };
   if (c === 'L') return { kind: 'look', x, y };
@@ -666,7 +669,7 @@ function facingTarget() {
   if (c === 'P') return { kind: 'look', x, y };
   return null;
 }
-const A_LABELS = { talk: 'Talk', take: 'Take', open: 'Open', read: 'Read', look: 'Look', power: 'Use' };
+const A_LABELS = { talk: 'Talk', take: 'Take', open: 'Open', read: 'Read', look: 'Look', power: 'Use', locked: 'Knock' };
 function interact() {
   const f = facingTarget();
   if (!f) return;
@@ -675,6 +678,7 @@ function interact() {
   if (f.kind === 'take') { runScript(() => takeTrinket(pickupAt(x, y))); return; }
   if (f.kind === 'open') { runScript(() => openChest(x, y)); return; }
   if (f.kind === 'read') { runScript(() => say(cur.def.signs[x + ',' + y])); return; }
+  if (f.kind === 'locked') { runScript(async () => { sfx('buzz'); await say(f.msg); }); return; }
   if (f.kind === 'power') { runScript(() => usePower(f.p, x, y)); return; }
   const c = tileAt(x, y);
   if (c === 'L') { runScript(() => cur.def.spring()); return; }
