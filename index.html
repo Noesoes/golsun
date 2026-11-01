@@ -28,14 +28,18 @@
   #gl { position: absolute; left: 0; top: 0; display: block; }
   #game { position: relative; display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: transparent; }
   #controls { position: relative; flex: 1 1 auto; min-height: 176px; }
-  #stick { position: absolute; left: 6%; top: 50%; transform: translateY(-50%); width: 150px; height: 150px; touch-action: none; }
-  #stick .base { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #3a2e5e, #241c40 70%);
-    border: 2px solid #574a8a; box-shadow: inset 0 4px 12px rgba(0,0,0,.45), 0 4px 10px rgba(0,0,0,.4); }
-  #stick .base::before { content: ''; position: absolute; inset: 22%; border-radius: 50%; border: 2px dashed rgba(230,220,255,.12); }
-  #stick .knob { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%;
-    background: radial-gradient(circle at 38% 32%, #b8a8ff, #6a58c0 60%, #4a3a90); box-shadow: inset 0 -4px 0 rgba(0,0,0,.3), inset 0 3px 0 rgba(255,255,255,.25), 0 6px 12px rgba(0,0,0,.5);
-    transition: transform .12s ease-out; will-change: transform; }
-  #stick.active .knob { transition: none; filter: brightness(1.12); }
+  #dpad { position: absolute; left: 6%; top: 50%; transform: translateY(-50%); width: 156px; height: 156px; touch-action: none; }
+  #dpad .arm { position: absolute; background: linear-gradient(#3e3266, #2a2148); border: 2px solid #574a8a; box-shadow: inset 0 -5px 0 rgba(0,0,0,.3), 0 4px 10px rgba(0,0,0,.4); }
+  #dpad .h { left: 0; right: 0; top: 52px; height: 52px; border-radius: 14px; }
+  #dpad .v { top: 0; bottom: 0; left: 52px; width: 52px; border-radius: 14px; }
+  #dpad .hub { position: absolute; left: 54px; top: 54px; width: 48px; height: 48px; background: #30264f; }
+  #dpad .hub::after { content: ''; position: absolute; left: 16px; top: 16px; width: 16px; height: 16px; border-radius: 50%; background: #251c40; }
+  #dpad .tri { position: absolute; width: 0; height: 0; border: 10px solid transparent; opacity: .65; transition: opacity .08s; }
+  #dpad .tu { left: 68px; top: 12px; border-bottom: 13px solid #e6dcff; border-top: 0; }
+  #dpad .td { left: 68px; bottom: 12px; border-top: 13px solid #e6dcff; border-bottom: 0; }
+  #dpad .tl { top: 68px; left: 12px; border-right: 13px solid #e6dcff; border-left: 0; }
+  #dpad .tr { top: 68px; right: 12px; border-left: 13px solid #e6dcff; border-right: 0; }
+  #dpad[data-dir="up"] .tu, #dpad[data-dir="down"] .td, #dpad[data-dir="left"] .tl, #dpad[data-dir="right"] .tr { opacity: 1; filter: drop-shadow(0 0 6px #ffd36a); }
   #btns { position: absolute; right: 4%; top: 50%; transform: translateY(-50%); width: 176px; height: 160px; }
   .btn { position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; touch-action: none;
     color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.35); box-shadow: inset 0 -5px 0 rgba(0,0,0,.3), inset 0 3px 0 rgba(255,255,255,.25), 0 4px 10px rgba(0,0,0,.5);
@@ -51,8 +55,8 @@
   @media (orientation: landscape) and (max-height: 600px) {
     #screen { position: absolute; top: 4px; bottom: 4px; left: 150px; right: 150px; }
     #controls { position: absolute; inset: 0; height: auto; pointer-events: none; }
-    #stick, #btns { pointer-events: auto; }
-    #stick { left: 8px; top: auto; bottom: 18px; transform: scale(.88); transform-origin: left bottom; }
+    #dpad, #btns { pointer-events: auto; }
+    #dpad { left: 8px; top: auto; bottom: 18px; transform: scale(.88); transform-origin: left bottom; }
     #btns { right: 2px; top: auto; bottom: 20px; transform: scale(.8); transform-origin: right bottom; }
   }
 </style>
@@ -61,7 +65,10 @@
 <div id="app">
   <div id="screen"><div id="stage"><canvas id="gl"></canvas><canvas id="game" width="864" height="576"></canvas></div></div>
   <div id="controls">
-    <div id="stick"><div class="base"></div><div class="knob"></div></div>
+    <div id="dpad">
+      <div class="arm h"></div><div class="arm v"></div><div class="hub"></div>
+      <div class="tri tu"></div><div class="tri td"></div><div class="tri tl"></div><div class="tri tr"></div>
+    </div>
     <div id="btns">
       <div class="btn" data-k="p">✦<small>Tool</small></div>
       <div class="btn" data-k="a">A<small>Action</small></div>

@@ -393,9 +393,23 @@ function buildMap(m, st) {
     Bookcase_2: [1.9, 'h'], Table_Large: [1.1, 'w'], Stool: [0.45, 'h'], Bed_Twin1: [1.0, 'w'], Workbench: [1.0, 'w'] };
   const sizeOf = (k) => { const n = k.split('/')[1]; for (const [p, v] of Object.entries(SIZES)) if (n === p || n.startsWith(p + '_') || n.startsWith(p)) return v; return [1, 'h']; };
   for (const [ck, items] of Object.entries(L)) { const k = ck.split('|')[0]; const [sz, mode] = sizeOf(k); const caveRock = cave && k.includes('Rock_Medium'); instances(world, k, sz, mode, items, { tint: caveRock ? 0x8a7aa8 : null, cast: !k.includes('Grass') && !k.includes('Clover') && !k.includes('Pebble') && !k.includes('Flower') }); }
+  // buildings: collision follows the real model, not the rectangle reserved for it on the map
+  const open = new Set(), rc = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), org = new THREE.Vector3();
   for (const hs of def.houses || []) {
     const o = building(hs.kind, hs.w, hs.h); o.position.set(hs.x + hs.w / 2, 0, hs.y + hs.h / 2 + 0.1); world.add(o);
+    o.updateMatrixWorld(true);
+    for (let y = hs.y; y < hs.y + hs.h; y++) for (let x = hs.x; x < hs.x + hs.w; x++) {
+      if (m.t[y][x] === 'D') continue;
+      let hit = 0;
+      for (const [sx, sz] of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+        org.set(x + sx, 12, y + sz); rc.set(org, down);
+        const h = rc.intersectObject(o, true)[0];
+        if (h && h.point.y > 0.45) hit++;
+      }
+      if (hit < 3) open.add(x + ',' + y); // mostly empty ground: walkable
+    }
   }
+  W3D.openTiles = open;
   // atmosphere
   if (outdoor) { scene.background = new THREE.Color(0xa8d8f0); scene.fog = new THREE.Fog(0xa8d8f0, 20, 42); hemi.intensity = 1.25; sun.intensity = 2.4; hemi.color.set(0xd8ecff); hemi.groundColor.set(0x5a6a3a); }
   else if (interior) { scene.background = new THREE.Color(0x1a1410); scene.fog = null; hemi.intensity = 1.1; sun.intensity = 1.4; hemi.color.set(0xfff0d8); hemi.groundColor.set(0x6a4a30); }
