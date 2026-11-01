@@ -107,6 +107,12 @@ function makeTextures() {
       g.fillStyle = '#9a3a3a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#e8c070'; g.lineWidth = 3; g.strokeRect(5, 5, w - 10, h - 10);
       g.fillStyle = '#e8c070'; for (let i = 0; i < 4; i++) { g.save(); g.translate(w / 2, h / 2); g.rotate(i * Math.PI / 2); g.fillRect(-3, -14, 6, 6); g.restore(); }
     }, false),
+    rock: canvasTex(256, 256, (g, w, h) => {
+      g.fillStyle = '#b8b0a4'; g.fillRect(0, 0, w, h);
+      for (let y = 0; y < h;) { const bh = 10 + rnd() * 26, v = 150 + rnd() * 70 | 0; g.fillStyle = `rgb(${v},${v - 6},${v - 14})`; g.fillRect(0, y, w, bh); g.fillStyle = 'rgba(40,30,25,0.45)'; g.fillRect(0, y + bh - 2, w, 2); y += bh; }
+      for (let i = 0; i < 70; i++) { g.strokeStyle = `rgba(40,30,25,${0.25 + rnd() * 0.3})`; g.lineWidth = 1 + rnd(); const x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 10, y + 8 + rnd() * 18); g.stroke(); }
+      for (let i = 0; i < 500; i++) { const v = rnd() * 255 | 0; g.fillStyle = `rgba(${v},${v},${v},0.12)`; g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 2 + rnd() * 3); }
+    }),
     falls: canvasTex(64, 128, (g, w, h) => {
       g.fillStyle = '#8fd0f0'; g.fillRect(0, 0, w, h);
       for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(255,255,255,${0.3 + rnd() * 0.5})`; g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 3, 10 + rnd() * 30); }
@@ -196,38 +202,59 @@ function buildGround(m, def) {
   const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = true; mesh.userData.own = true;
   return mesh;
 }
+const CLIFF_H = 2.6;
 function buildWalls(m, def) {
-  const P = [], C = [], col = new THREE.Color();
-  const isWall = (x, y) => { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return true; return m.t[y][x] in WALLS; };
+  const T = { P: [], C: [] }, S = { P: [], C: [] }, col = new THREE.Color();
+  const wallAt = (c) => c in WALLS || c === 'v';
+  const isWall = (x, y) => { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return true; return wallAt(m.t[y][x]); };
   const jit = (x, y, amp) => (hash(x * 7 + 3, y * 11 + 5) - 0.5) * amp;
-  const quad = (a, b, c2, d, ca, cb) => { P.push(...a, ...b, ...c2, ...a, ...c2, ...d); C.push(...ca, ...ca, ...cb, ...ca, ...cb, ...cb); };
+  const quad = (o, a, b, c2, d, ca, cb) => { o.P.push(...a, ...b, ...c2, ...a, ...c2, ...d); o.C.push(...ca, ...ca, ...cb, ...ca, ...cb, ...cb); };
   for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
-    const c = m.t[y][x]; if (!(c in WALLS)) continue;
+    let c = m.t[y][x]; if (!wallAt(c)) continue;
+    if (c === 'v') c = 'M';
     const interior = c === 'Q', cave = c === '#';
-    let Hh = WALLS[c]; if (interior && y === m.h - 1) Hh = 0.35;
+    let Hh = c === 'M' ? CLIFF_H : WALLS[c]; if (interior && y === m.h - 1) Hh = 0.35;
     const amp = interior ? 0 : 0.35, xa = interior ? 0 : 0.12;
     const corner = (cx, cy) => [cx + jit(cx + 50, cy, xa), Hh + jit(cx, cy, amp), cy + jit(cx, cy + 50, xa)];
     const tl = corner(x, y), tr = corner(x + 1, y), bl = corner(x, y + 1), br = corner(x + 1, y + 1);
     const topC = cave ? [0.2, 0.17, 0.24] : interior ? [0.36, 0.24, 0.16] : (col.setHex(hash(x, y) < 0.5 ? 0x5e9a40 : 0x6aa646), [col.r, col.g, col.b]);
-    quad(tl, tr, br, bl, topC, topC);
-    const sideTop = cave ? [0.55, 0.48, 0.6] : interior ? [0.93, 0.88, 0.76] : [0.62, 0.52, 0.4];
-    const sideBot = cave ? [0.26, 0.22, 0.3] : interior ? [0.55, 0.38, 0.24] : [0.38, 0.3, 0.24];
+    quad(interior || cave ? S : T, tl, bl, br, tr, topC, topC); // counter-clockwise from above, so the top faces up
+    const sideTop = cave ? [0.55, 0.48, 0.6] : interior ? [0.93, 0.88, 0.76] : [0.95, 0.86, 0.72];
+    const sideBot = cave ? [0.26, 0.22, 0.3] : interior ? [0.55, 0.38, 0.24] : [0.55, 0.46, 0.38];
     const down = (p) => [p[0], -0.6, p[2]];
-    if (!isWall(x, y + 1)) quad(bl, br, down(br), down(bl), sideTop, sideBot);
-    if (!isWall(x, y - 1)) quad(tr, tl, down(tl), down(tr), sideTop, sideBot);
-    if (!isWall(x - 1, y)) quad(tl, bl, down(bl), down(tl), sideTop, sideBot);
-    if (!isWall(x + 1, y)) quad(br, tr, down(tr), down(br), sideTop, sideBot);
+    const o = interior || cave ? S : S;
+    if (!isWall(x, y + 1)) quad(o, br, bl, down(bl), down(br), sideTop, sideBot);
+    if (!isWall(x, y - 1)) quad(o, tl, tr, down(tr), down(tl), sideTop, sideBot);
+    if (!isWall(x - 1, y)) quad(o, bl, tl, down(tl), down(bl), sideTop, sideBot);
+    if (!isWall(x + 1, y)) quad(o, tr, br, down(br), down(tr), sideTop, sideBot);
   }
-  if (!P.length) return null;
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
-  g.computeVertexNormals();
-  const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true, map: TEX.ground }));
-  // uv for the noise texture: project top-down
-  const uv = []; for (let i = 0; i < P.length; i += 3) uv.push((P[i] + P[i + 1] * 0.7) / 3, (P[i + 2] + P[i + 1] * 0.7) / 3);
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.own = true;
-  return mesh;
+  const grp = new THREE.Group();
+  const mk = (o, map, sideUV) => {
+    if (!o.P.length) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(o.P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(o.C, 3));
+    g.computeVertexNormals();
+    const uv = [], P = o.P;
+    for (let i = 0; i < P.length; i += 3) {
+      if (sideUV) { const tri = Math.floor(i / 9) * 9, nx = Math.abs(P[tri + 3] - P[tri]) + Math.abs(P[tri + 6] - P[tri]), nz = Math.abs(P[tri + 5] - P[tri + 2]) + Math.abs(P[tri + 8] - P[tri + 2]); uv.push((nx >= nz ? P[i] : P[i + 2]) / 2.5, P[i + 1] / 2.5); }
+      else uv.push((P[i] + P[i + 1] * 0.7) / 3, (P[i + 2] + P[i + 1] * 0.7) / 3);
+    }
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true, map }));
+    mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.own = true; grp.add(mesh);
+  };
+  const outdoor = !!def.outdoor;
+  mk(T, TEX.ground, false);
+  mk(S, outdoor ? TEX.rock : TEX.ground, outdoor);
+  return grp.children.length ? grp : null;
+}
+function caveMouth() {
+  // an arched opening in the cliff face, framed by boulders
+  const g = new THREE.Group();
+  const sh = new THREE.Shape(); sh.moveTo(-0.55, 0); sh.lineTo(-0.55, 1.0); sh.absarc(0, 1.0, 0.55, Math.PI, 0, true); sh.lineTo(0.55, 0); sh.lineTo(-0.55, 0);
+  const hole = new THREE.Mesh(new THREE.ShapeGeometry(sh, 12), new THREE.MeshBasicMaterial({ color: 0x05030a })); hole.position.z = 0.03; hole.userData.own = true; g.add(hole);
+  const rim = new THREE.Mesh(new THREE.ShapeGeometry(sh, 12), new THREE.MeshStandardMaterial({ color: 0x2a2228, roughness: 1 })); rim.scale.set(1.22, 1.12, 1); rim.position.z = 0.02; rim.userData.own = true; g.add(rim);
+  return g;
 }
 function sign() {
   const g = new THREE.Group(), wood = new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.9 }), board = new THREE.MeshStandardMaterial({ color: 0xc8955a, roughness: 0.9 });
@@ -300,7 +327,7 @@ function buildMap(m, st) {
     else if (c === 'F') add('bld/fence_wood_straight', { x: cx, z: cz, r: (m.t[y][x - 1] === 'F' || m.t[y][x + 1] === 'F') ? Math.PI / 2 : 0, s: 1 });
     else if (c === 'u') add(interior ? 'props/Barrel' : 'props/Barrel_Apples', { x: cx, z: cz, r, s: 1 });
     else if (c === 'x') add('props/Crate_Wooden', { x: cx, z: cz, r: r * 0.1, s: 1 });
-    else if (c === 'q') add('nature/Plant_7', { x: cx, z: cz, r, s: 1 });
+    else if (c === 'q') { add('props/Pot_1', { x: cx, z: cz, r, s: 1 }); add('nature/Fern_1', { x: cx, y: 0.32, z: cz, r, s: 0.6 }); }
     else if (c === 'Y') add('props/Bookcase_2', { x: cx, z: cz - 0.25, r: 0, s: 1 });
     else if (c === 'k') { add('props/Table_Large', { x: cx, z: cz, r: 0, s: 1 }); add('props/Stool', { x: cx - 0.6, z: cz + 0.5, r: 0, s: 1 }); }
     else if (c === 'e') add('props/Bed_Twin1', { x: cx, z: cz, r: 0, s: 1 });
@@ -316,11 +343,14 @@ function buildMap(m, st) {
       const mat = new THREE.MeshBasicMaterial({ color: interior ? 0x6a3a2a : 0x05030a });
       const p = new THREE.Mesh(new THREE.PlaneGeometry(interior ? 0.8 : 1.1, interior ? 0.5 : 1.2), mat); p.rotation.x = -Math.PI / 2; p.position.set(cx, 0.02, cz); p.userData.own = true; world.add(p);
     } else if (c === 'v') {
-      const p = new THREE.Mesh(new THREE.PlaneGeometry(1, 1.5), new THREE.MeshBasicMaterial({ color: 0x05030a })); p.position.set(cx, 0.75, y + 0.02); p.userData.own = true; world.add(p);
+      const o = caveMouth(); o.position.set(cx, 0, y + 1); world.add(o);
+      add('nature/Rock_Medium_1', { x: cx - 0.75, z: y + 1.15, r: 0.4, s: 1.6 }); add('nature/Rock_Medium_3', { x: cx + 0.78, z: y + 1.1, r: 2.1, s: 1.5 });
+      add('nature/Rock_Medium_2', { x: cx + 0.1, y: 1.75, z: y + 0.95, r: 1.2, s: 1.3 });
+      for (const sx of [-1, 1]) { const t = lampPost(); t.position.set(cx + sx * 1.15, 0, y + 1.35); t.scale.setScalar(0.8); world.add(t); }
     } else if (c === '~' && outdoor && y > 0 && (m.t[y - 1][x] === 'M' || y === 0)) {
       // waterfall where the river leaves the cliffs
-      const f = new THREE.Mesh(new THREE.PlaneGeometry(1.02, 2.2), new THREE.MeshStandardMaterial({ map: TEX.falls.clone(), transparent: true, opacity: 0.9, emissive: 0x335566, roughness: 0.2 }));
-      f.material.map.needsUpdate = true; f.position.set(cx, 0.75, y + 0.05); f.userData.own = true; world.add(f); falls.push(f);
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(1.02, CLIFF_H + 0.7), new THREE.MeshStandardMaterial({ map: TEX.falls.clone(), transparent: true, opacity: 0.9, emissive: 0x335566, roughness: 0.2 }));
+      f.material.map.needsUpdate = true; f.position.set(cx, (CLIFF_H - 0.7) / 2, y + 0.05); f.userData.own = true; world.add(f); falls.push(f);
     }
     // grass detail on open ground
     if (outdoor && (c === '.' || c === ',')) {
@@ -338,14 +368,14 @@ function buildMap(m, st) {
     if (cave && c === '_' && h < 0.14) add('nature/Pebble_Round_' + (h2 < 0.5 ? 1 : 3), { x: cx, z: cz, r, s: 1 });
     if (outdoor && c === 'M') {
       const front = m.t[y + 1] && m.t[y + 1][x] !== 'M' && m.t[y + 1][x] !== 'v';
-      if (front && h < 0.35) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx, y: 0, z: cz + 0.45, r, s: 0.9 });
-      if (!front && h < 0.3) add('nature/Pine_' + (1 + ((h * 30) | 0) % 3), { x: cx, y: 1.7, z: cz, r, s: 0.9 });
-      else if (h > 0.75) add('nature/Bush_Common_Flowers', { x: cx, y: 1.7, z: cz, r, s: 0.9 });
+      if (front && h < 0.6) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + (h2 - 0.5) * 0.4, y: -0.1, z: cz + 0.5, r, s: 0.9 + h2 * 0.9 });
+      if (!front && h < 0.55) add('nature/Pine_' + (1 + ((h * 30) | 0) % 3), { x: cx + (h2 - 0.5) * 0.5, y: CLIFF_H, z: cz, r, s: 1 + h2 * 0.5 });
+      else if (h > 0.8) add('nature/Bush_Common_Flowers', { x: cx, y: CLIFF_H, z: cz, r, s: 0.9 });
     }
   }
   const SIZES = { CommonTree: [3.1, 'h'], Pine: [3.0, 'h'], Bush_Common: [1.0, 'w'], Bush_Common_Flowers: [0.95, 'w'], Flower_3_Group: [0.5, 'h'], Flower_4_Group: [0.5, 'h'],
     Grass_Wispy_Tall: [0.75, 'h'], Grass_Common_Tall: [0.7, 'h'], Grass_Common_Short: [0.28, 'h'], Clover_1: [0.35, 'w'], Pebble_Round: [0.25, 'w'], Mushroom_Common: [0.28, 'h'], Mushroom_Laetiporus: [0.45, 'h'],
-    Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.75, 'h'], Barrel_Apples: [0.75, 'h'], Crate_Wooden: [0.6, 'h'], Plant_7: [0.8, 'h'],
+    Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.75, 'h'], Barrel_Apples: [0.75, 'h'], Crate_Wooden: [0.6, 'h'], Plant_7: [0.8, 'h'], Pot_1: [0.4, 'h'],
     Bookcase_2: [1.9, 'h'], Table_Large: [1.1, 'w'], Stool: [0.45, 'h'], Bed_Twin1: [1.0, 'w'], Workbench: [1.0, 'w'] };
   const sizeOf = (k) => { const n = k.split('/')[1]; for (const [p, v] of Object.entries(SIZES)) if (n === p || n.startsWith(p + '_') || n.startsWith(p)) return v; return [1, 'h']; };
   for (const [ck, items] of Object.entries(L)) { const k = ck.split('|')[0]; const [sz, mode] = sizeOf(k); const caveRock = cave && k.includes('Rock_Medium'); instances(world, k, sz, mode, items, { tint: caveRock ? 0x8a7aa8 : null, cast: !k.includes('Grass') && !k.includes('Clover') && !k.includes('Pebble') && !k.includes('Flower') }); }
