@@ -561,7 +561,7 @@ function updateMap(dt) {
     n.fx = n.x; n.fy = n.y; n.x = nx; n.y = ny; n.t = 0; n.moving = true;
   }
   if (P.moving) {
-    P.t += dt / ((held.b || stickRun ? 110 : 190) * (P.diag ? 1.41 : 1)); P.anim += dt;
+    P.t += dt / (held.b || stickRun ? 125 : 185); P.anim += dt;
     if (P.t < 1) return;
     P.t = 1; P.moving = false;
     onStep();
@@ -700,8 +700,10 @@ async function openChest(x, y) {
   setTile(x, y, 'c'); sfx('chest');
   for (let i = 0; i < 14; i++) fx.push({ x: x * TS + HT, y: y * TS + HT, vx: rand(-0.8, 0.8), vy: rand(-1.6, -0.4), life: 1, col: pick(['#ffe080', '#ffffff', '#ffc040']), s: 1 });
   if (ch.gold) { state.gold += ch.gold; await say(`Found ${ch.gold} coins!`); return; }
-  addItem(ch.item, ch.n || 1);
-  await say(`Found ${ch.n > 1 ? ch.n + ' × ' : ''}${ITEMS[ch.item].name}!`);
+  const item = String(ch.item).startsWith('gear:') ? rollGear(+ch.item.slice(5)) : ch.item;
+  addItem(item, ch.n || 1);
+  await say(`Found ${ch.n > 1 ? ch.n + ' × ' : ''}${ITEMS[item].name}!${ITEMS[item].slot ? ' ' + itemDesc(item) + '.' : ''}`);
+  if (ITEMS[item].slot) await offerEquip(item);
 }
 async function takeTrinket(w) {
   const t = TRINKETS[w.id];
@@ -1207,7 +1209,9 @@ async function victory() {
     }
   }
   let drop = null;
-  if (!B.boss && Math.random() < 0.2) { drop = pick(['herb', 'herb', 'tea']); addItem(drop); }
+  if (B.boss) { drop = rollGear(3); addItem(drop); }
+  else if (Math.random() < 0.09) { drop = rollGear(B.bg === 'field' ? (Math.random() < 0.7 ? 1 : 2) : (Math.random() < 0.7 ? 2 : 3)); addItem(drop); }
+  else if (Math.random() < 0.2) { drop = pick(['herb', 'herb', 'tea']); addItem(drop); }
   B.result = { xp, gold, ups, drop };
   B.msg = '';
   if (ups.length) { sfx('level'); setTimeout(() => music('level'), 1600); }
@@ -1287,7 +1291,7 @@ function drawBattleUI() {
     }
   });
   if (B.result) {
-    const r = B.result, lines = [`+${r.xp} XP    +${r.gold} coins`].concat(r.drop ? [`Found a ${ITEMS[r.drop].name}!`] : []).concat(r.ups);
+    const r = B.result, lines = [`+${r.xp} XP    +${r.gold} coins`].concat(r.drop ? [`Found ${ITEMS[r.drop].slot ? 'gear: ' : 'a '}${ITEMS[r.drop].name}!`] : []).concat(r.ups);
     const h = 30 + lines.length * 12;
     box(W / 2 - 100, 30, 200, h, { border: COL.gold });
     font(12, true); text('Victory!', W / 2, 46, COL.gold, 'center');
@@ -1325,14 +1329,15 @@ async function pauseMenu() {
   let c = 0;
   UI.panel = drawPartySummary;
   while (true) {
-    c = await choose(['Status', 'Items', 'Skills', 'Trinkets', 'Settings', 'Save'], { x: 196, y: 4, w: 88, cursor: c });
+    c = await choose(['Status', 'Items', 'Equip', 'Skills', 'Trinkets', 'Settings', 'Save'], { x: 196, y: 4, w: 88, cursor: c });
     if (c < 0) break;
     if (c === 0) await statusPage();
     if (c === 1) await itemsMenu();
-    if (c === 2) await fieldSkillsMenu();
-    if (c === 3) await trinketMenu();
-    if (c === 4) await settingsMenu();
-    if (c === 5) { const ok = saveGame(); sfx(ok ? 'chest' : 'buzz'); toast(ok ? 'Game saved!' : "Couldn't save on this device."); }
+    if (c === 2) await equipMenu();
+    if (c === 3) await fieldSkillsMenu();
+    if (c === 4) await trinketMenu();
+    if (c === 5) await settingsMenu();
+    if (c === 6) { const ok = saveGame(); sfx(ok ? 'chest' : 'buzz'); toast(ok ? 'Game saved!' : "Couldn't save on this device."); }
   }
   UI.panel = null;
 }
@@ -1373,7 +1378,8 @@ async function statusPage() {
 }
 async function useItemField(id) {
   const it = ITEMS[id];
-  if (!it.use) { await say(`${it.name} is equipment. Gear is equipped when you buy it at the shop.`); return; }
+  if (it.slot) { if (!state.party.some((m) => canEquip(m, id))) toast('Nobody in your party can use this. You could sell it.'); else await offerEquip(id); return; }
+  if (!it.use) return;
   if (it.use === 'healAll') { removeItem(id); sfx('heal'); state.party.filter((m) => m.hp > 0).forEach((m) => (m.hp = Math.min(stats(m).hp, m.hp + it.power))); toast('Everyone feels refreshed!'); return; }
   const dead = it.use === 'revive';
   const m = await chooseMember(`Use ${it.name} on:`, (m) => `${m.hp}/${stats(m).hp}`, (m) => (dead ? m.hp <= 0 : m.hp > 0));
@@ -1456,7 +1462,50 @@ async function settingsMenu() {
 }
 
 // ---------- shop & inn ----------
-function itemDesc(id) { const it = ITEMS[id]; if (it.slot === 'weapon') return `Weapon · Attack +${it.atk}${it.note ? ' · ' + it.note : ''}${it.cls ? ' · ' + CLASSES[it.cls].name + ' only' : ''}`; if (it.slot === 'armor') return `Armor · Defense +${it.def}`; return it.desc; }
+// ---------- equipment ----------
+function canEquip(m, id) { const it = ITEMS[id]; if (it.slot === 'armor') return true; if (it.slot !== 'weapon') return false; return it.cls ? HEROES[m.id].cls === it.cls : CLASS_WEAPONS[HEROES[m.id].cls].includes(it.type); }
+function whoCanUse(id) { const ok = state.party.filter((m) => canEquip(m, id)).map(hname); return ok.length ? 'For ' + ok.join(', ') : 'Nobody in your party can use this'; }
+function gearDiff(m, id) {
+  const before = stats(m), keep = m[ITEMS[id].slot]; m[ITEMS[id].slot] = id; const after = stats(m); m[ITEMS[id].slot] = keep;
+  const parts = []; for (const [k, lab] of [['atk', 'ATK'], ['def', 'DEF'], ['hp', 'HP'], ['fp', 'FP'], ['agi', 'AGI']]) { const d = after[k] - before[k]; if (d) parts.push(`${lab} ${d > 0 ? '+' : ''}${d}`); }
+  return parts.join(' ') || 'no change';
+}
+function equip(m, id) { const slot = ITEMS[id].slot, old = m[slot]; removeItem(id); m[slot] = id; if (old) addItem(old); clampHero(m); }
+function unequip(m, slot) { if (m[slot]) { addItem(m[slot]); m[slot] = null; clampHero(m); } }
+// random gear of a tier that suits someone in the party (chests and drops)
+function rollGear(tier) {
+  const m = pick(state.party), cls = HEROES[m.id].cls;
+  if (Math.random() < 0.3) return pick(Object.keys(ITEMS).filter((k) => ITEMS[k].slot === 'armor' && ITEMS[k].tier === Math.min(3, tier)));
+  const type = pick(CLASS_WEAPONS[cls]);
+  return Object.keys(ITEMS).find((k) => ITEMS[k].slot === 'weapon' && ITEMS[k].type === type && ITEMS[k].tier === Math.min(3, tier) && !ITEMS[k].cls);
+}
+async function offerEquip(id) {
+  const users = state.party.filter((m) => canEquip(m, id));
+  if (!users.length) return;
+  const m = await chooseMember(`Equip ${ITEMS[id].name}?`, (m) => gearDiff(m, id), (m) => canEquip(m, id), { x: 100, w: 180 });
+  if (m) { equip(m, id); sfx('chest'); toast(`${hname(m)} equipped the ${ITEMS[id].name}!`); }
+}
+async function equipMenu() {
+  const m = await chooseMember('Equip whom?', (m) => (m.weapon ? ITEMS[m.weapon].name : 'No weapon'), null, { x: 60, w: 200 });
+  if (!m) return;
+  let c = 0;
+  while (true) {
+    c = await choose([
+      { label: 'Weapon', right: (m.weapon ? ITEMS[m.weapon].name : '—') + (m.up && m.up.w ? ' +' + m.up.w : ''), desc: `${HEROES[m.id].role}s can use: ${CLASS_WEAPONS[HEROES[m.id].cls].map((t) => WEAPON_TYPES[t]).join(', ')}.` },
+      { label: 'Armor', right: (m.armor ? ITEMS[m.armor].name : '—') + (m.up && m.up.a ? ' +' + m.up.a : ''), desc: 'Anyone can wear any armor.' },
+    ], { title: `${hname(m)} · ATK ${stats(m).atk} · DEF ${stats(m).def}`, x: 30, y: 40, w: 228, cursor: c });
+    if (c < 0) return;
+    const slot = c === 0 ? 'weapon' : 'armor';
+    const owned = Object.keys(state.items).filter((id) => ITEMS[id].slot === slot && canEquip(m, id));
+    const opts = owned.map((id) => ({ label: ITEMS[id].name, icon: ART.icon(ITEMS[id].icon), right: gearDiff(m, id), desc: itemDesc(id) })).concat(m[slot] ? [{ label: 'Take it off', desc: 'Put it back in the bag.' }] : []);
+    if (!opts.length) { toast(slot === 'weapon' ? 'No weapons this hero can use. Try the shop or the smith!' : 'No spare armor in the bag.'); continue; }
+    const j = await choose(opts, { title: slot === 'weapon' ? 'Weapons' : 'Armor', x: 40, y: 70, w: 220, max: 7 });
+    if (j < 0) continue;
+    if (j >= owned.length) { unequip(m, slot); sfx('cancel'); continue; }
+    equip(m, owned[j]); sfx('chest');
+  }
+}
+function itemDesc(id) { const it = ITEMS[id]; if (it.slot === 'weapon') return `${WEAPON_TYPES[it.type] || 'Weapon'} · Attack +${it.atk}${it.note ? ' · ' + it.note : ''} · ${it.cls ? CLASSES[it.cls].name + ' only' : whoCanUse(id)}`; if (it.slot === 'armor') return `Armor · Defense +${it.def}${it.note ? ' · ' + it.note : ''}`; return it.desc; }
 async function shopScript() {
   UI.goldBox = true;
   while (true) {
@@ -1467,21 +1516,22 @@ async function shopScript() {
   await say('Thanks! Come again!', 'dorrit');
 }
 async function shopBuy() {
-  let c = 0;
+  let cat = 0;
   while (true) {
-    c = await choose(SHOP_LIST.map((id) => ({ label: ITEMS[id].name, icon: ART.icon(ITEMS[id].icon), right: ITEMS[id].price + 'c', desc: itemDesc(id) + (state.items[id] ? ` (You have ${state.items[id]}.)` : ''), disabled: ITEMS[id].price > state.gold })),
-      { title: 'Buy', x: 76, y: 30, w: 168, cursor: c, max: Math.min(9, Math.floor((H - 80) / 13)) });
-    if (c < 0) return;
-    const id = SHOP_LIST[c], it = ITEMS[id];
-    if (it.slot) {
-      const m = await chooseMember('Equip on:', (m) => { const o = m[it.slot] ? ITEMS[m[it.slot]] : null; const d = (it.atk || it.def) - (o ? o.atk || o.def : 0); return (d >= 0 ? '+' : '') + d + (it.slot === 'weapon' ? ' ATK' : ' DEF'); }, null, { x: 120, w: 150 });
-      if (!m) continue;
-      const old = m[it.slot];
-      if (old === id) { toast(`${hname(m)} already has that.`); continue; }
-      state.gold -= it.price; m[it.slot] = id; sfx('chest');
-      if (old) { const refund = Math.floor(ITEMS[old].price / 2); state.gold += refund; toast(`Equipped! Old gear sold for ${refund}c.`, 2200); }
-      else toast(`${hname(m)} equipped the ${it.name}!`);
-    } else { state.gold -= it.price; addItem(id); sfx('chest'); toast(`Bought a ${it.name}.`, 900); }
+    const cats = [['Supplies', SHOP_STOCK.supplies], ['Weapons', SHOP_STOCK.weapons.concat(state.flags.bossDead ? SHOP_STOCK.late.filter((k) => ITEMS[k].slot === 'weapon') : [])], ['Armor', SHOP_STOCK.armor.concat(state.flags.bossDead ? SHOP_STOCK.late.filter((k) => ITEMS[k].slot === 'armor') : [])]];
+    cat = await choose(cats.map((c) => c[0]), { title: 'Buy', x: 76, y: 30, w: 90, cursor: cat });
+    if (cat < 0) return;
+    const list = cats[cat][1];
+    let c = 0;
+    while (true) {
+      c = await choose(list.map((id) => { const it = ITEMS[id], useful = !it.slot || state.party.some((m) => canEquip(m, id));
+        return { label: it.name, icon: ART.icon(it.icon), right: it.price + 'c', color: useful ? null : COL.dim, desc: itemDesc(id) + (state.items[id] ? ` (You have ${state.items[id]}.)` : ''), disabled: it.price > state.gold }; }),
+        { title: cats[cat][0], x: 70, y: 30, w: 200, cursor: c, max: Math.min(9, Math.floor((H - 80) / 13)) });
+      if (c < 0) break;
+      const id = list[c], it = ITEMS[id];
+      state.gold -= it.price; addItem(id); sfx('chest');
+      if (it.slot) await offerEquip(id); else toast(`Bought a ${it.name}.`, 900);
+    }
   }
 }
 async function shopSell() {
@@ -1542,8 +1592,8 @@ async function smithSignature() {
     if (c < 0) return;
     const m = state.party[c], id = list[c], old = m.weapon;
     state.gold -= ITEMS[id].price; m.weapon = id; sfx('fire'); await sleep(300); sfx('chest');
-    if (old) { const refund = Math.floor(ITEMS[old].price / 2); state.gold += refund; toast(`${hname(m)} wields the ${ITEMS[id].name}! Old weapon sold for ${refund}c.`, 2400); }
-    else toast(`${hname(m)} wields the ${ITEMS[id].name}!`, 2000);
+    if (old) addItem(old);
+    toast(`${hname(m)} wields the ${ITEMS[id].name}!${old ? ' The old one went in the bag.' : ''}`, 2200);
   }
 }
 async function innScript() {

@@ -136,25 +136,52 @@ const ITEMS = {
   tea: { name: 'Focus Tea', icon: 'tonic', price: 20, use: 'fp', power: 15, target: 'ally', desc: 'Restores 15 FP to one ally.' },
   salts: { name: 'Smelling Salts', icon: 'plume', price: 60, use: 'revive', target: 'deadAlly', desc: 'Revives a fallen ally with half HP.' },
   sunberry: { name: 'Sunberry', icon: 'berry', price: 80, use: 'healAll', power: 60, target: 'allAllies', desc: 'Restores 60 HP to every ally.' },
-  tinblade: { name: 'Tin Blade', icon: 'weapon', price: 70, slot: 'weapon', atk: 4 },
-  steelblade: { name: 'Steel Blade', icon: 'weapon', price: 200, slot: 'weapon', atk: 9 },
-  starsteel: { name: 'Starsteel Edge', icon: 'weapon', price: 450, slot: 'weapon', atk: 15 },
-  quilted: { name: 'Quilted Vest', icon: 'armor', price: 50, slot: 'armor', def: 3 },
-  chain: { name: 'Chain Vest', icon: 'armor', price: 180, slot: 'armor', def: 7 },
-  moonweave: { name: 'Moonweave Coat', icon: 'armor', price: 420, slot: 'armor', def: 11 },
+  // weapons: six types, three tiers. Each class can wield certain types (see CLASS_WEAPONS).
+  tinblade: { name: 'Tin Blade', icon: 'weapon', price: 70, slot: 'weapon', type: 'sword', tier: 1, atk: 4 },
+  steelblade: { name: 'Steel Blade', icon: 'weapon', price: 200, slot: 'weapon', type: 'sword', tier: 2, atk: 9 },
+  starsteel: { name: 'Starsteel Edge', icon: 'weapon', price: 450, slot: 'weapon', type: 'sword', tier: 3, atk: 15 },
+  hatchet: { name: 'Hatchet', icon: 'weapon', price: 80, slot: 'weapon', type: 'axe', tier: 1, atk: 5 },
+  waraxe: { name: 'War Axe', icon: 'weapon', price: 210, slot: 'weapon', type: 'axe', tier: 2, atk: 10 },
+  emberaxe: { name: 'Emberbite Axe', icon: 'weapon', price: 470, slot: 'weapon', type: 'axe', tier: 3, atk: 16 },
+  oakstaff: { name: 'Oak Staff', icon: 'weapon', price: 70, slot: 'weapon', type: 'staff', tier: 1, atk: 3, bonus: { fp: 4 }, note: 'FP +4' },
+  willowstaff: { name: 'Willow Staff', icon: 'weapon', price: 200, slot: 'weapon', type: 'staff', tier: 2, atk: 7, bonus: { fp: 8 }, note: 'FP +8' },
+  moonstaff: { name: 'Moonwood Staff', icon: 'weapon', price: 450, slot: 'weapon', type: 'staff', tier: 3, atk: 11, bonus: { fp: 14 }, note: 'FP +14' },
+  irondagger: { name: 'Iron Dagger', icon: 'weapon', price: 70, slot: 'weapon', type: 'dagger', tier: 1, atk: 4, bonus: { agi: 2 }, note: 'AGI +2' },
+  twindirks: { name: 'Twin Dirks', icon: 'weapon', price: 200, slot: 'weapon', type: 'dagger', tier: 2, atk: 8, bonus: { agi: 4 }, note: 'AGI +4' },
+  shadowfang: { name: 'Shadowfang', icon: 'weapon', price: 450, slot: 'weapon', type: 'dagger', tier: 3, atk: 13, bonus: { agi: 6 }, note: 'AGI +6' },
+  shortbow: { name: 'Shortbow', icon: 'weapon', price: 70, slot: 'weapon', type: 'bow', tier: 1, atk: 4 },
+  yewbow: { name: 'Yew Bow', icon: 'weapon', price: 200, slot: 'weapon', type: 'bow', tier: 2, atk: 9 },
+  galebow: { name: 'Galestring Bow', icon: 'weapon', price: 450, slot: 'weapon', type: 'bow', tier: 3, atk: 14, bonus: { agi: 2 }, note: 'AGI +2' },
+  cudgel: { name: 'Ash Cudgel', icon: 'weapon', price: 70, slot: 'weapon', type: 'mace', tier: 1, atk: 4, bonus: { def: 1 }, note: 'DEF +1' },
+  ironmace: { name: 'Iron Mace', icon: 'weapon', price: 200, slot: 'weapon', type: 'mace', tier: 2, atk: 9, bonus: { def: 2 }, note: 'DEF +2' },
+  sunhammer: { name: 'Sunhammer', icon: 'weapon', price: 450, slot: 'weapon', type: 'mace', tier: 3, atk: 14, bonus: { def: 3 }, note: 'DEF +3' },
+  // armor: anyone can wear it
+  quilted: { name: 'Quilted Vest', icon: 'armor', price: 50, slot: 'armor', tier: 1, def: 3 },
+  leather: { name: 'Leather Jerkin', icon: 'armor', price: 110, slot: 'armor', tier: 1, def: 5, bonus: { agi: 2 }, note: 'AGI +2' },
+  chain: { name: 'Chain Vest', icon: 'armor', price: 180, slot: 'armor', tier: 2, def: 7 },
+  mossmail: { name: 'Mossmail', icon: 'armor', price: 260, slot: 'armor', tier: 2, def: 8, bonus: { hp: 10 }, note: 'HP +10' },
+  moonweave: { name: 'Moonweave Coat', icon: 'armor', price: 420, slot: 'armor', tier: 3, def: 11, bonus: { fp: 6 }, note: 'FP +6' },
+  wardplate: { name: 'Wardplate', icon: 'armor', price: 480, slot: 'armor', tier: 3, def: 14 },
 };
 // Hollis's signature weapons: one per class, each with a little extra
 const SIGNATURE = { warden: 'bastion', berserker: 'cleaver', mage: 'emberstaff', rogue: 'galedaggers', ranger: 'longbow', druid: 'briarstaff' };
 Object.assign(ITEMS, {
-  bastion: { name: 'Bastion Mace', icon: 'weapon', price: 300, slot: 'weapon', atk: 10, cls: 'warden', bonus: { def: 4 }, note: 'DEF +4' },
-  cleaver: { name: 'Cinder Cleaver', icon: 'weapon', price: 300, slot: 'weapon', atk: 16, cls: 'berserker', note: 'the heaviest blade in the Vale' },
-  emberstaff: { name: 'Emberwood Staff', icon: 'weapon', price: 300, slot: 'weapon', atk: 8, cls: 'mage', bonus: { fp: 10 }, note: 'FP +10' },
-  galedaggers: { name: 'Galewhisper Daggers', icon: 'weapon', price: 300, slot: 'weapon', atk: 12, cls: 'rogue', bonus: { agi: 5 }, note: 'AGI +5' },
-  longbow: { name: 'Hawkeye Longbow', icon: 'weapon', price: 300, slot: 'weapon', atk: 13, cls: 'ranger', bonus: { agi: 3 }, note: 'AGI +3' },
-  briarstaff: { name: 'Briarheart Staff', icon: 'weapon', price: 300, slot: 'weapon', atk: 9, cls: 'druid', bonus: { hp: 16 }, note: 'HP +16' },
+  bastion: { name: 'Bastion Mace', icon: 'weapon', price: 300, slot: 'weapon', type: 'mace', tier: 4, atk: 10, cls: 'warden', bonus: { def: 4 }, note: 'DEF +4' },
+  cleaver: { name: 'Cinder Cleaver', icon: 'weapon', price: 300, slot: 'weapon', type: 'axe', tier: 4, atk: 16, cls: 'berserker', note: 'the heaviest blade in the Vale' },
+  emberstaff: { name: 'Emberwood Staff', icon: 'weapon', price: 300, slot: 'weapon', type: 'staff', tier: 4, atk: 8, cls: 'mage', bonus: { fp: 10 }, note: 'FP +10' },
+  galedaggers: { name: 'Galewhisper Daggers', icon: 'weapon', price: 300, slot: 'weapon', type: 'dagger', tier: 4, atk: 12, cls: 'rogue', bonus: { agi: 5 }, note: 'AGI +5' },
+  longbow: { name: 'Hawkeye Longbow', icon: 'weapon', price: 300, slot: 'weapon', type: 'bow', tier: 4, atk: 13, cls: 'ranger', bonus: { agi: 3 }, note: 'AGI +3' },
+  briarstaff: { name: 'Briarheart Staff', icon: 'weapon', price: 300, slot: 'weapon', type: 'staff', tier: 4, atk: 9, cls: 'druid', bonus: { hp: 16 }, note: 'HP +16' },
 });
 const HONE_COST = [60, 140, 260], REINFORCE_COST = [50, 120, 220];
-const SHOP_LIST = ['herb', 'tea', 'salts', 'tinblade', 'quilted', 'steelblade', 'chain', 'starsteel', 'moonweave'];
+const WEAPON_TYPES = { sword: 'Sword', axe: 'Axe', staff: 'Staff', dagger: 'Dagger', bow: 'Bow', mace: 'Mace' };
+const CLASS_WEAPONS = { warden: ['sword', 'mace'], berserker: ['axe', 'sword'], mage: ['staff'], rogue: ['dagger', 'sword'], ranger: ['bow', 'dagger'], druid: ['staff', 'mace'] };
+const SHOP_STOCK = {
+  supplies: ['herb', 'tea', 'salts'],
+  weapons: ['tinblade', 'hatchet', 'oakstaff', 'irondagger', 'shortbow', 'cudgel', 'steelblade', 'waraxe', 'willowstaff', 'twindirks', 'yewbow', 'ironmace'],
+  armor: ['quilted', 'leather', 'chain', 'mossmail'],
+  late: ['starsteel', 'emberaxe', 'moonstaff', 'shadowfang', 'galebow', 'sunhammer', 'moonweave', 'wardplate'],
+};
 
 const ENEMIES = {
   puddle: { name: 'Puddlejelly', shape: 'slime', hp: 20, atk: 8, def: 3, agi: 5, xp: 8, gold: 4, weak: 'bloom', resist: 'ember' },
@@ -338,7 +365,7 @@ const MAPS = {
       '2,10': 'West: Mossbell Village.\nNortheast: Whisper Grotto.',
       '26,12': 'Whisper Grotto: straight north.\nThe Rootwell spring rises within.',
     },
-    chests: { '31,6': { item: 'herb', n: 2 }, '5,18': { item: 'tea', n: 2 }, '27,20': { item: 'salts', n: 1 }, '5,3': { gold: 150, locked: true } },
+    chests: { '31,6': { item: 'gear:1' }, '5,18': { item: 'tea', n: 2 }, '27,20': { item: 'salts', n: 1 }, '5,3': { item: 'gear:3', locked: true } },
     trinkets: [{ id: 'thimble', x: 7, y: 17 }],
     onStep: (x, y) => (!state.flags.corinJoined && x >= 24 && y <= 10 ? corinScript : null),
     npcs: [
@@ -390,7 +417,7 @@ const MAPS = {
       '###########X############',
     ],
     warps: [{ x: 11, y: 25, to: 'field', tx: 27, ty: 3, dir: 'down' }],
-    chests: { '6,20': { item: 'herb', n: 2 }, '16,13': { item: 'sunberry', n: 1 }, '17,19': { item: 'sunberry', n: 2, locked: true } },
+    chests: { '6,20': { item: 'gear:2' }, '16,13': { item: 'sunberry', n: 1 }, '17,19': { item: 'gear:3', locked: true } },
     trinkets: [{ id: 'owlquill', x: 3, y: 6 }, { id: 'mosslocket', x: 22, y: 11 }],
     npcs: [
       { id: 'tamsin', x: 2, y: 11, who: 'tamsin', dir: 'right', cond: () => !state.flags.tamsinJoined, talk: async () => tamsinScript() },

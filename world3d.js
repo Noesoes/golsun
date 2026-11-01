@@ -574,7 +574,9 @@ function syncMap(dt, S) {
     if (i === 0) a.rotTarget = P.rot != null ? P.rot : DIR_ROT[dir];
     else if (moving) { const A3 = P.hist[i + 1] || P.hist[P.hist.length - 1], B3 = P.hist[i] || A3; a.rotTarget = Math.atan2(B3.x - A3.x, B3.y - A3.y); }
     else a.rotTarget = DIR_ROT[dir];
-    playAct(a, moving ? (S.running ? 'Running_A' : 'Walking_A') : 'Idle_A');
+    // a jog whose stride matches how fast the party crosses tiles, so feet don't slide
+    playAct(a, moving ? 'Running_A' : 'Idle_A', 0.1);
+    if (a.actions.Running_A) a.actions.Running_A.timeScale = S.running ? 1.45 : 1.05;
   });
   for (const n of cur.npcs) {
     const id = 'npc_' + cur.id + '_' + n.id; ids.add(id);
@@ -593,7 +595,7 @@ function syncMap(dt, S) {
     if (!ids.has(id)) { a.obj.visible = false; continue; }
     if (a.rotTarget !== undefined) {
       let d = a.rotTarget - a.obj.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
-      a.obj.rotation.y += d * Math.min(1, dt / 90);
+      a.obj.rotation.y += d * Math.min(1, dt / 40);
     }
     a.mixer.update(dt / 1000);
   }
@@ -614,7 +616,7 @@ function syncMap(dt, S) {
   const cx = interior ? tx : Math.max(halfW + 1, Math.min(mapInfo.w - halfW - 1, tx));
   const cz = interior ? tz : Math.max(halfTop + 1, Math.min(mapInfo.h - halfBot, tz));
   const goal = new THREE.Vector3(cx, 0, cz);
-  if (!camInit) { camTarget.copy(goal); camInit = true; } else camTarget.lerp(goal, Math.min(1, dt / 160));
+  if (!camInit) { camTarget.copy(goal); camInit = true; } else camTarget.lerp(goal, Math.min(1, dt / 55));
   const dist = interior ? 9.5 : 13.5;
   camera.position.set(camTarget.x, camTarget.y + dist * 0.76, camTarget.z + dist * 0.66);
   camera.lookAt(camTarget.x, 0, camTarget.z - 0.6);
