@@ -537,6 +537,7 @@ const bHemi = new THREE.HemisphereLight(0xd8ecff, 0x5a6a3a, 1.2), bSun = new THR
 bSun.position.set(-3, 10, 9); bSun.castShadow = true; bSun.shadow.mapSize.set(1024, 1024); Object.assign(bSun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 });
 battleScene.add(bHemi, bSun, bGlow);
 let arena = null, arenaKind = '', bModels = [];
+const b3 = new WeakMap(); // battle participant -> 3D model (kept out of the save state)
 const ENEMY_MODEL = { slime: 'Slime', squirrel: 'Rat', wasp: 'Wasp', worm: 'Snake', mushroom: 'Frog', turtle: 'Spider', moth: 'Bat', ghost: 'Skeleton', wraith: 'Dragon' };
 const ENEMY_H = { Slime: 0.75, Rat: 0.9, Wasp: 0.85, Snake: 1.25, Frog: 0.95, Spider: 0.95, Bat: 1.3, Skeleton: 1.7, Dragon: 2.6 };
 const ENEMY_TINT = { wraith: 0x9a7ad8, ghost: 0xd8d0ff, moth: 0xc8b0ff };
@@ -594,7 +595,7 @@ function battleStart(B, party, heroPos) {
     const mo = monsterObj(model, hgt); tintMonster(mo, e.d.shape);
     const p = screenToGround(battleCam, e.x, e.y); mo.obj.position.copy(p); mo.home = p.clone();
     mo.obj.rotation.y = Math.PI / 2 - 0.35;
-    battleScene.add(mo.obj); e.m3 = mo; bModels.push(mo);
+    battleScene.add(mo.obj); b3.set(e, mo); bModels.push(mo);
     // screen-space size for the 2D effects layer
     const top = project(battleCam, p.x, hgt, p.z), bot = project(battleCam, p.x, 0, p.z);
     const hpx = Math.max(10, bot.y - top.y);
@@ -604,7 +605,7 @@ function battleStart(B, party, heroPos) {
     const c = CAST[m.id]; const a = makeActor(c[0], c[1], c[2]);
     const hp = heroPos(i), p = screenToGround(battleCam, hp.x, hp.y);
     a.obj.position.copy(p); a.home = p.clone(); a.obj.rotation.y = -Math.PI / 2 + 0.35; a.obj.scale.setScalar(1.05);
-    battleScene.add(a.obj); m.__a3 = a; bModels.push(a);
+    battleScene.add(a.obj); b3.set(m, a); bModels.push(a);
   });
   const p0 = screenToGround(battleCam, heroPos(0).x, heroPos(0).y);
   const t = project(battleCam, p0.x, 1.12, p0.z), b = project(battleCam, p0.x, 0, p0.z);
@@ -612,7 +613,7 @@ function battleStart(B, party, heroPos) {
 }
 function battleSync(dt, B, party, T) {
   for (const e of B.enemies) {
-    const mo = e.m3; if (!mo) continue;
+    const mo = b3.get(e); if (!mo) continue;
     const ox = (e.shake > 0 ? Math.sin(T / 14) * 0.06 : 0) + (e.lunge > 0 ? Math.sin((e.lunge / 300) * Math.PI) * 0.7 : 0);
     mo.obj.position.set(mo.home.x + ox, mo.home.y + (e.d.float ? 0.35 + Math.sin(T / 300 + mo.home.x) * 0.12 : 0), mo.home.z);
     if (e.lunge > 200 && mo.cur === 'idle') monPlay(mo, 'attack');
@@ -627,7 +628,7 @@ function battleSync(dt, B, party, T) {
     mo.mixer.update(dt / 1000);
   }
   party.forEach((m, i) => {
-    const a = m.__a3; if (!a) return;
+    const a = b3.get(m); if (!a) return;
     const shk = B.heroShake[m.id] || 0, st = B.heroStep[m.id] || 0;
     const ox = (shk > 0 ? Math.sin(T / 14) * 0.05 + 0.1 : 0) - (st > 0 ? Math.sin((st / 380) * Math.PI) * 0.8 : 0);
     a.obj.position.set(a.home.x + ox, a.home.y + (B.active === i ? Math.abs(Math.sin(T / 160)) * 0.08 : 0), a.home.z);
@@ -639,7 +640,7 @@ function battleSync(dt, B, party, T) {
   });
 }
 function battleEnd() { for (const m of bModels) m.obj.removeFromParent(); bModels = []; }
-function enemyScreen(e) { const p = e.m3 ? e.m3.obj.position : null; return p ? project(battleCam, p.x, 0, p.z) : null; }
+function enemyScreen(e) { const mo = b3.get(e), p = mo ? mo.obj.position : null; return p ? project(battleCam, p.x, 0, p.z) : null; }
 
 // ------------------------------------------------------------------ title / ending
 let titleT = 0;
