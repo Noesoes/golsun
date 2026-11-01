@@ -32,7 +32,7 @@ Together they travel through Windmere Fields and into Whisper Grotto to find out
 | Tap screen  | –                 | Walk somewhere; tap people or things to interact |
 | Arrow pad   | Arrows / WASD    | Move, choose menu options (hold B to run)     |
 | **A**       | Z / Enter / Space | Talk, open, use a tool, confirm              |
-| **B**       | X / Esc / Shift   | Back; hold to run                            |
+| **B**       | X / Esc / Shift   | Back; hold to walk (or to run, if Always run is off in Settings) |
 | **✦ Tool**  | C / Q             | Use the right tool on what you're facing     |
 | **☰ Menu**  | M / Tab           | Status, items, skills, Trinkets, settings, save |
 

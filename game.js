@@ -15,7 +15,7 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
 };
-const settings = Object.assign({ music: true, sfx: true, text: 1 }, (() => { try { return JSON.parse(store.get(SET_KEY)) || {}; } catch (e) { return {}; } })());
+const settings = Object.assign({ music: true, sfx: true, text: 1, autoRun: true }, (() => { try { return JSON.parse(store.get(SET_KEY)) || {}; } catch (e) { return {}; } })());
 function saveSettings() { store.set(SET_KEY, JSON.stringify(settings)); }
 function font(px, bold) { ctx.font = (bold ? '600 ' : '400 ') + px + 'px ' + FONT; }
 
@@ -308,6 +308,9 @@ function handleInput(k) {
   }
 }
 let pendingAction = null, stickRun = false;
+// Always run (Settings): sprint by default, hold B to walk. Off: hold B to run.
+const running = () => (settings.autoRun ? !held.b : !!held.b);
+function updateRunLabel() { const el = document.getElementById('blabel'); if (el) el.textContent = settings.autoRun ? 'Back / Walk' : 'Back / Run'; }
 function doMapAction(k) {
   if (k === 'a') interact();
   else if (k === 'p') usePowerKey();
@@ -561,7 +564,7 @@ function updateMap(dt) {
     n.fx = n.x; n.fy = n.y; n.x = nx; n.y = ny; n.t = 0; n.moving = true;
   }
   if (P.moving) {
-    P.t += dt / (held.b || stickRun ? 125 : 185); P.anim += dt;
+    P.t += dt / (running() ? 125 : 185); P.anim += dt;
     if (P.t < 1) return;
     P.t = 1; P.moving = false;
     onStep();
@@ -770,7 +773,7 @@ async function usePower(p, x, y) {
 let lastMapT = 0;
 function renderMap() {
   const dt = Math.min(50, T - (lastMapT || T)); lastMapT = T;
-  W3D.syncMap(dt, { cur, P, state, T, dirTo, running: held.b || stickRun });
+  W3D.syncMap(dt, { cur, P, state, T, dirTo, running: running() });
   bx.clearRect(0, 0, W, H);
   const cx = (P.x - 7) * TS, cy = (P.y - 8) * TS; VW = 14 * TS; VH = 16 * TS;
   ambient(cx, cy);
@@ -1450,13 +1453,15 @@ async function settingsMenu() {
       { label: 'Music', right: settings.music ? 'On' : 'Off' },
       { label: 'Sound effects', right: settings.sfx ? 'On' : 'Off' },
       { label: 'Text speed', right: ['Normal', 'Fast', 'Instant'][settings.text] },
+      { label: 'Always run', right: settings.autoRun ? 'On' : 'Off', desc: settings.autoRun ? 'You sprint everywhere. Hold B to walk.' : 'Hold B to run.' },
       { label: 'Graphics', right: settings.gfx === 'low' ? 'Fast' : 'Fancy' },
     ], { title: 'Settings', x: 64, y: 50, w: 160, cursor: c });
     if (c < 0) return;
     if (c === 0) settings.music = !settings.music;
     if (c === 1) settings.sfx = !settings.sfx;
     if (c === 2) settings.text = (settings.text + 1) % 3;
-    if (c === 3) { settings.gfx = settings.gfx === 'low' ? 'high' : 'low'; settings.gfxAuto = false; W3D.setQuality(settings.gfx); }
+    if (c === 3) { settings.autoRun = !settings.autoRun; updateRunLabel(); }
+    if (c === 4) { settings.gfx = settings.gfx === 'low' ? 'high' : 'low'; settings.gfxAuto = false; W3D.setQuality(settings.gfx); }
     applyAudio(); saveSettings();
   }
 }
@@ -1850,7 +1855,7 @@ function render(dt) {
   if (game.scene !== 'map') setButtonHints(UI.menus.length || game.scene === 'battle' ? 'Confirm' : 'Action', false);
 }
 
-resize();
+resize(); updateRunLabel();
 requestAnimationFrame(frame);
 let loadP = 0, loadErr = null;
 (async () => {

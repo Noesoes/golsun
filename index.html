@@ -43,9 +43,10 @@
   #btns { position: absolute; right: 4%; top: 50%; transform: translateY(-50%); width: 176px; height: 160px; }
   .btn { position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; touch-action: none;
     color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.35); box-shadow: inset 0 -5px 0 rgba(0,0,0,.3), inset 0 3px 0 rgba(255,255,255,.25), 0 4px 10px rgba(0,0,0,.5);
-    font-size: 24px; transition: transform .06s, filter .06s; }
+    font-size: 26px; transition: transform .06s, filter .06s;
+    font-family: -apple-system, "SF Pro Rounded", system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0; }
   .btn.on { transform: scale(.9); filter: brightness(1.25); }
-  .btn small { position: absolute; bottom: -17px; font-size: 11px; font-weight: 400; color: #a89cd0; white-space: nowrap; text-shadow: none; }
+  .btn small { position: absolute; bottom: -18px; font-size: 12px; font-weight: 600; color: #a89cd0; white-space: nowrap; text-shadow: none; }
   .btn[data-k="a"] { width: 68px; height: 68px; right: 0; top: 30px; background: radial-gradient(circle at 35% 30%, #ff9a7a, #d23e3e); }
   .btn[data-k="b"] { width: 58px; height: 58px; right: 80px; top: 78px; background: radial-gradient(circle at 35% 30%, #ffe08a, #c08a2a); }
   .btn[data-k="p"] { width: 46px; height: 46px; right: 88px; top: 2px; font-size: 20px; background: radial-gradient(circle at 35% 30%, #8ff0c8, #2a8a7a); }
@@ -72,7 +73,7 @@
     <div id="btns">
       <div class="btn" data-k="p">✦<small>Tool</small></div>
       <div class="btn" data-k="a">A<small>Action</small></div>
-      <div class="btn" data-k="b">B<small>Back / Run</small></div>
+      <div class="btn" data-k="b">B<small id="blabel">Back / Walk</small></div>
       <div class="btn" data-k="m">☰<small>Menu</small></div>
     </div>
   </div>
