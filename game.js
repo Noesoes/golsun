@@ -229,8 +229,8 @@ function wrap(text, maxW) {
   return out;
 }
 // who: key in PEOPLE (shows a portrait), or omitted for narration.
-// story text names the hero "Wren" and uses {her}; swap in the player's chosen name and pronouns
-function heroText(t) { return String(t).replace(/\bWren\b/g, () => HERO.name).replace(/\{her\}/g, () => PRONOUNS[HERO.pro].her); }
+// story text names the hero "Wren"; swap in the player's chosen name
+function heroText(t) { return String(t).replace(/\bWren\b/g, () => HERO.name); }
 function say(text, who, nameOverride, hold) {
   text = heroText(text);
   return new Promise((res) => {
@@ -435,8 +435,8 @@ function newState() {
   state = { map: 'village', x: 14, y: 7, dir: 'down', party: [], gold: 30, items: { herb: 2 }, flags: {}, mods: {}, trinkets: {}, known: {}, harmony: 0, steps: 0, time: 0 };
 }
 function startParty(hero) {
-  if (typeof hero === 'string') hero = { name: 'Wren', pro: 'she', outfit: 0, cls: hero };
-  state.hero = { name: hero.name, pro: hero.pro, outfit: hero.outfit };
+  if (typeof hero === 'string') hero = { name: 'Wren', outfit: 0, cls: hero };
+  state.hero = { name: hero.name, outfit: hero.outfit };
   state.classes = assignClasses(hero.cls); applyClasses(state.classes, state.hero);
   state.party = [makeMember('wren', 1)];
 }
@@ -469,7 +469,7 @@ function loadGame() {
       // saves from before classes existed: give everyone the class closest to their old role
       if (!state.classes) state.classes = { wren: 'ranger', bram: 'warden', corin: 'rogue', tamsin: 'druid' };
       for (const m of state.party) state.flags[m.id + 'Joined'] = true;
-      applyClasses(state.classes, state.hero || { name: 'Wren', pro: 'she', outfit: 0 });
+      applyClasses(state.classes, state.hero || { name: 'Wren', outfit: 0 });
       for (const m of state.party) clampHero(m);
       return true;
     }
@@ -1620,7 +1620,7 @@ function askName(current) {
   });
 }
 async function createCharacter() {
-  const hero = { name: 'Wren', pro: 'she', outfit: 0, cls: 'warden' };
+  const hero = { name: 'Wren', outfit: 0, cls: 'warden' };
   const prev = UI.panel;
   UI.panel = () => {
     rc(0, 0, W, H, 'rgba(8,4,18,0.78)');
@@ -1629,9 +1629,8 @@ async function createCharacter() {
     font(11, true); text('Create your hero', W / 2, 20, COL.gold, 'center');
     ctx.imageSmoothingEnabled = true; ctx.drawImage(W3D.figure(hero.cls + ':wren:' + hero.outfit), 14, 24, 84, 120); ctx.imageSmoothingEnabled = false;
     font(15, true); text(hero.name, 114, 46, COL.text);
-    font(8); text(PRONOUNS[hero.pro].label, 114, 58, COL.dim);
-    font(10, true); text(c.name, 114, 76, ELEM_TEXT[c.elem]); font(8); text(`${ELEM_NAME[c.elem]} element · ${OUTFITS[hero.outfit].name} outfit`, 114, 88, COL.dim);
-    font(8); wrap(c.blurb, W - 128).forEach((l, i) => text(l, 114, 102 + i * 10, COL.text));
+    font(10, true); text(c.name, 114, 66, ELEM_TEXT[c.elem]); font(8); text(`${ELEM_NAME[c.elem]} element · ${OUTFITS[hero.outfit].name} outfit`, 114, 80, COL.dim);
+    font(8); wrap(c.blurb, W - 128).forEach((l, i) => text(l, 114, 96 + i * 10, COL.text));
     font(8, true); text(`Passive: ${c.passive.name}`, 12, 156, '#8a4ab0'); font(8); wrap(c.passive.desc, W - 28).forEach((l, i) => text(l, 12, 167 + i * 10, COL.text));
     font(8, true); text('Starting skills', 12, 190, COL.gold);
     font(8); c.skills.filter((a) => a[1] === 1).forEach(([id], i) => wrap(`${SKILLS[id].name}: ${SKILLS[id].desc}`, W - 28).slice(0, 2).forEach((l, j) => text(l, 12, 201 + i * 22 + j * 10, COL.text)));
@@ -1641,16 +1640,14 @@ async function createCharacter() {
   while (true) {
     c = await choose([
       { label: 'Name', right: hero.name },
-      { label: 'Pronouns', right: PRONOUNS[hero.pro].label },
       { label: 'Class', right: CLASSES[hero.cls].name, color: ELEM_TEXT[CLASSES[hero.cls].elem] },
       { label: 'Outfit colors', right: OUTFITS[hero.outfit].name },
       { label: 'Begin the adventure', color: COL.gold },
     ], { x: 8, bottom: H - 6, w: W - 16, cursor: c, cancel: false });
     if (c === 0) { sfx('confirm'); hero.name = await askName(hero.name); }
-    else if (c === 1) { const ks = Object.keys(PRONOUNS); hero.pro = ks[(ks.indexOf(hero.pro) + 1) % ks.length]; }
-    else if (c === 2) { const keep = UI.panel; UI.panel = null; hero.cls = await chooseClass(hero); UI.panel = keep; }
-    else if (c === 3) hero.outfit = (hero.outfit + 1) % OUTFITS.length;
-    else if (c === 4) {
+    else if (c === 1) { const keep = UI.panel; UI.panel = null; hero.cls = await chooseClass(hero); UI.panel = keep; }
+    else if (c === 2) hero.outfit = (hero.outfit + 1) % OUTFITS.length;
+    else if (c === 3) {
       const ok = await choose([`Yes, I'm ${hero.name} the ${CLASSES[hero.cls].name}`, 'Not yet'], { x: W / 2 - 90, bottom: H - 6, w: 180 });
       if (ok === 0) break;
     }
