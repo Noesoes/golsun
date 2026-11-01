@@ -430,7 +430,10 @@ const fx = [];
 
 function newState() {
   state = { map: 'village', x: 14, y: 7, dir: 'down', party: [], gold: 30, items: { herb: 2 }, flags: {}, mods: {}, trinkets: {}, known: {}, harmony: 0, steps: 0, time: 0 };
-  state.party.push(makeMember('wren', 1), makeMember('bram', 1));
+}
+function startParty(cls) {
+  state.classes = assignClasses(cls); applyClasses(state.classes);
+  state.party = [makeMember('wren', 1)];
 }
 function makeMember(id, lv) { const m = { id, lv, xp: 0, hp: 1, fp: 1, weapon: null, armor: null }; const s = stats(m); m.hp = s.hp; m.fp = s.fp; return m; }
 function trinketOf(m) { if (!state) return null; for (const k in state.trinkets) if (state.trinkets[k] === m.id) return TRINKETS[k]; return null; }
@@ -453,7 +456,21 @@ function saveGame() {
   state.map = cur.id; state.x = P.x; state.y = P.y; state.dir = P.dir;
   return store.set(SAVE_KEY, JSON.stringify(state));
 }
-function loadGame() { try { const s = JSON.parse(store.get(SAVE_KEY)); if (s && s.party) { state = s; state.known = state.known || {}; state.trinkets = state.trinkets || {}; return true; } } catch (e) {} return false; }
+function loadGame() {
+  try {
+    const s = JSON.parse(store.get(SAVE_KEY));
+    if (s && s.party) {
+      state = s; state.known = state.known || {}; state.trinkets = state.trinkets || {};
+      // saves from before classes existed: give everyone the class closest to their old role
+      if (!state.classes) state.classes = { wren: 'ranger', bram: 'warden', corin: 'rogue', tamsin: 'druid' };
+      for (const m of state.party) state.flags[m.id + 'Joined'] = true;
+      applyClasses(state.classes);
+      for (const m of state.party) clampHero(m);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
 function goalChanged() { UI.goalT = 6000; toast('New goal: ' + goalText(), 2600); }
 
 // ===================== MAP =====================
@@ -462,7 +479,7 @@ const SAME = {
   Q: (c) => c === 'Q', R: (c) => c === 'R', H: (c) => c === 'H' || c === 'D', F: (c) => c === 'F', g: (c) => c === 'g',
 };
 SAME['%'] = SAME.o = SAME['|'] = SAME['~']; SAME.D = SAME.H;
-const SOLID = new Set('T~#HRBOPCcSFKbYLrMQtuxwlzmqke '.split(''));
+const SOLID = new Set('T~#HRBOPCcJSFKbYLrMQtuxwlzmqke '.split(''));
 
 function loadMap(id) {
   const def = MAPS[id];
@@ -617,7 +634,7 @@ function tapMap(lx, ly) {
   if (tx < 0 || ty < 0 || tx >= cur.w || ty >= cur.h) return;
   if (tx === P.x && ty === P.y) { interact(); return; }
   const c = tileAt(tx, ty);
-  const interesting = npcAt(tx, ty) || pickupAt(tx, ty) || 'CSOBLP'.includes(c) || (c === '~' && hasPower('bloom')) || (c === 'K' && (npcAt(tx, ty - 1) || npcAt(tx, ty + 1)));
+  const interesting = npcAt(tx, ty) || pickupAt(tx, ty) || 'CJSOBLP'.includes(c) || (c === '~' && hasPower('bloom')) || (c === 'K' && (npcAt(tx, ty - 1) || npcAt(tx, ty + 1)));
   if (interesting) {
     if (Math.abs(tx - P.x) + Math.abs(ty - P.y) === 1) { P.dir = dirTo(P.x, P.y, tx, ty); interact(); return; }
     const r = findPath(tx, ty, true);
@@ -640,6 +657,7 @@ function facingTarget() {
   if (n) return { kind: 'talk', n, x, y };
   if (pickupAt(x, y)) return { kind: 'take', x, y };
   if (c === 'C') return { kind: 'open', x, y };
+  if (c === 'J') return hasPower('pick') ? { kind: 'power', p: 'pick', x, y } : { kind: 'look', x, y };
   if (c === 'S') return { kind: 'read', x, y };
   if (c === 'L') return { kind: 'look', x, y };
   if (c === 'O') return hasPower('gust') ? { kind: 'power', p: 'gust', x, y } : { kind: 'look', x, y };
@@ -663,6 +681,7 @@ function interact() {
   if (c === 'O') runScript(() => say('A huge boulder. Something with a strong gust might move it.'));
   if (c === 'B') runScript(() => say('A tangle of thorny brambles. A little fire would clear these right out.'));
   if (c === 'P') runScript(() => say('A deep pit. Something heavy could fill it in.'));
+  if (c === 'J') runScript(() => say('A chest bound in iron, with a heavy brass lock. Someone with the right key could open it.'));
 }
 function usePowerKey() {
   const f = facingTarget();
@@ -714,6 +733,13 @@ const POWERS = {
       for (let i = 0; i < 40; i++) fx.push({ x: x * TS + rand(2, 30), y: y * TS + rand(6, 30), vx: rand(-0.3, 0.3), vy: rand(-1.2, -0.3), life: rand(0.6, 1), col: pick(['#ff7a3a', '#ffcf40', '#ff4020', '#fff0a0']), s: 1 });
       await sleep(550);
       setTile(x, y, cur.def.ground); dust(x, y, '#5a4a40');
+      return true;
+    } },
+  pick: { name: 'Skeleton Key', fp: 0, user: 'corin',
+    async apply(x, y) {
+      sfx('blip'); await sleep(250); sfx('blip'); await sleep(250);
+      setTile(x, y, 'C'); sfx('chest'); await sleep(200);
+      await openChest(x, y);
       return true;
     } },
   bloom: { name: 'Lilypad', fp: 2, user: 'tamsin',
@@ -798,7 +824,7 @@ function makeEnemy(id) {
 const bY = () => Math.round(H * 0.6) + 6;
 let HERO_H = 40;
 const BS = () => HERO_H / 16; // floating numbers etc. are offset by the hero's on-screen height
-const heroPos = (i) => ({ x: 198 + i * 30, y: bY() - 24 + i * 24 });
+const heroPos = (i) => (state.party.length > 3 ? { x: 178 + i * 26, y: bY() - 34 + i * 21 } : { x: 198 + i * 30, y: bY() - 24 + i * 24 });
 const enemyHit = (e) => ({ x: e.x, y: e.y - e.sz.h * 0.5 - (e.d.float ? 14 : 0) });
 function anim(name, x, y, sc = 2, ms = 60) { if (B) B.anims.push({ name, x, y, sc, ms, t: 0 }); }
 async function msg(t, ms = 650) { B.msg = t; await waitOrTap(ms + t.length * 12); }
@@ -828,6 +854,8 @@ async function battle(ids, opt = {}) {
   B.enemies.forEach((e) => (cnt[e.id] = (cnt[e.id] || 0) + 1));
   B.enemies.forEach((e) => { if (cnt[e.id] > 1) { seen[e.id] = (seen[e.id] || 0) + 1; e.name += ' ' + 'ABC'[seen[e.id] - 1]; } });
   layoutEnemies();
+  if (state.party.some((m) => isCls(m, 'ranger'))) B.enemies.forEach((e) => (state.known[e.id] = true));
+  B.regen = {}; B.taunt = null;
   HERO_H = W3D.battleStart(B, state.party, heroPos).heroH;
   sfx('encounter');
   UI.flashCol = '#fff';
@@ -869,6 +897,14 @@ function layoutEnemies() {
 function checkEnd() { if (B.enemies.every((e) => !e.alive)) return 'win'; if (state.party.every((m) => m.hp <= 0)) return 'lose'; return null; }
 async function endRound() {
   for (const id in B.buffs) for (const k in B.buffs[id]) if (--B.buffs[id][k] <= 0) delete B.buffs[id][k];
+  if (B.taunt && --B.taunt.n <= 0) B.taunt = null;
+  for (const e of B.enemies) if (e.debuff && --e.debuff.def <= 0) e.debuff = null;
+  for (const m of state.party) {
+    const r = B.regen[m.id];
+    if (r && m.hp > 0) { healHero(m, Math.max(1, Math.round(stats(m).hp * 0.1 * r.k)), true); }
+    if (r && --r.n <= 0) delete B.regen[m.id];
+    if (isCls(m, 'mage') && m.hp > 0) m.fp = Math.min(stats(m).fp, m.fp + 2);
+  }
   for (const m of state.party) {
     if (m.hp <= 0) continue;
     const t = trinketOf(m), s = stats(m);
@@ -902,7 +938,7 @@ async function chooseCommand(m, i, first) {
     const desc = { attack: 'Strike one foe with your weapon.', skills: `Use a skill. (FP ${m.fp}/${stats(m).fp})`, items: 'Use an item from your bag.', guard: 'Halve damage this round and regain 2 FP.',
       burst: full ? `${bu.name}: ${bu.desc}` : 'Fill the Harmony gauge (top right) to unleash a Burst.', auto: 'Everyone attacks this round.', back: 'Go back to the previous hero.', flee: 'Try to run away.' };
     const c = await choose(cmds.map((c) => ({ label: c[0], disabled: (c[1] === 'flee' && !first) || (c[1] === 'burst' && !full), color: c[1] === 'burst' && full ? COL.gold : null, desc: desc[c[1]] })),
-      { x: 140, y: H - 47, w: 146, cols: 3, cursor: B.lastCmd[i] || 0, max: 3, cancel: !first });
+      { x: 140, y: H - (state.party.length > 3 ? 54 : 47), w: 146, cols: 3, cursor: B.lastCmd[i] || 0, max: 3, cancel: !first });
     if (c < 0) return 'back';
     B.lastCmd[i] = c;
     const key = cmds[c][1];
@@ -912,7 +948,7 @@ async function chooseCommand(m, i, first) {
     if (key === 'burst') { const tg = await pickTargets(bu.target); if (tg == null) continue; return { type: 'burst', actor: m, target: tg }; }
     if (key === 'skills') {
       const list = skillsOf(m);
-      const j = await choose(list.map((id) => ({ label: SKILLS[id].name, right: SKILLS[id].fp + ' FP', disabled: SKILLS[id].fp > m.fp, desc: SKILLS[id].desc, color: SKILLS[id].type === 'dmg' ? null : '#c8f0d0' })),
+      const j = await choose(list.map((id) => ({ label: SKILLS[id].name, right: SKILLS[id].hpCost ? Math.round(SKILLS[id].hpCost * 100) + '% HP' : SKILLS[id].fp + ' FP', disabled: SKILLS[id].fp > m.fp, desc: SKILLS[id].desc, color: SKILLS[id].type === 'dmg' ? null : '#c8f0d0' })),
         { x: 2, bottom: H - 1, w: 136, title: `${hname(m)}'s Skills`, max: 4, cursor: (B.lastSk && B.lastSk[i]) || 0 });
       if (j < 0) continue;
       (B.lastSk = B.lastSk || {})[i] = j;
@@ -952,8 +988,18 @@ async function pickTargets(type) {
   return 'all';
 }
 function physDmg(atk, def) { return Math.max(1, Math.round((atk - def * 0.5) * rand(0.85, 1.15))); }
+const isCls = (m, k) => HEROES[m.id].cls === k;
+const defOf = (e) => e.def * (e.debuff && e.debuff.def ? 0.5 : 1);
+// class passives that scale damage dealt to a foe
+function dmgMul(m, t) { let k = 1; if (isCls(m, 'berserker') && m.hp < stats(m).hp / 2) k *= 1.3; if (isCls(m, 'ranger') && t.debuff) k *= 1.25; return k; }
+const healMul = (m) => (isCls(m, 'druid') ? 1.25 : 1);
+function enemyTarget(targets) {
+  if (B.taunt) { const tm = targets.find((m) => m.id === B.taunt.id); if (tm && Math.random() < 0.8) return tm; }
+  return pick(targets);
+}
+const dodges = (m) => B.buffs[m.id] && B.buffs[m.id].eva && Math.random() < 0.35;
 function buffMul(m, k) { return B.buffs[m.id] && B.buffs[m.id][k] ? (k === 'def' ? 1.5 : 1.3) : 1; }
-function elemMul(t, elem) { return t.d.weak === elem ? 1.5 : t.d.resist === elem ? 0.5 : 1; }
+function elemMul(t, elem) { if (!elem) return 1; return t.d.weak === elem ? 1.5 : t.d.resist === elem ? 0.5 : 1; }
 function retarget(t) { if (t && t.alive) return t; const al = B.enemies.filter((e) => e.alive); return al.length ? pick(al) : null; }
 function float(x, y, txt, col, big) { B.floats.push({ x, y, txt, col, t: 0, big }); }
 function gainHarmony(n) { const was = state.harmony; state.harmony = Math.min(100, state.harmony + n); if (was < 100 && state.harmony >= 100) { sfx('trinket'); float(W - 44, 32, 'Burst ready!', COL.gold); } }
@@ -979,6 +1025,7 @@ async function hitEnemy(t, dmg, note) {
 }
 async function hitHero(m, dmg) {
   if (B.guard[m.id]) dmg = Math.max(1, Math.round(dmg / 2));
+  if (isCls(m, 'warden')) dmg = Math.max(1, Math.round(dmg * 0.85));
   m.hp = Math.max(0, m.hp - dmg);
   const hp = heroPos(state.party.indexOf(m));
   B.heroShake[m.id] = 320;
@@ -1001,8 +1048,8 @@ async function doAction(a) {
   if (a.type === 'attack') {
     const t = retarget(a.target); if (!t) return;
     B.msg = `${name} attacks!`; B.heroStep[m.id] = 380; await sleep(200);
-    let dmg = physDmg(s.atk * buffMul(m, 'atk'), t.def), note = null;
-    if (Math.random() < 0.08) { dmg = Math.round(dmg * 1.6); note = 'Critical!'; sfx('crit'); B.shake = 200; } else sfx('hit');
+    let dmg = Math.round(physDmg(s.atk * buffMul(m, 'atk'), defOf(t)) * dmgMul(m, t)), note = null;
+    if (Math.random() < (isCls(m, 'rogue') ? 0.25 : 0.08)) { dmg = Math.round(dmg * 1.6); note = 'Critical!'; sfx('crit'); B.shake = 200; } else sfx('hit');
     const p = enemyHit(t);
     anim('slash', p.x, p.y, BS(), 45);
     await hitEnemy(t, dmg, note);
@@ -1012,6 +1059,11 @@ async function doAction(a) {
   if (a.type === 'skill') {
     const sk = SKILLS[a.skill];
     if (m.fp < sk.fp) { await msg(`${name} doesn't have enough FP!`); return; }
+    if (sk.hpCost) {
+      const cost = Math.ceil(stats(m).hp * sk.hpCost);
+      if (m.hp <= cost) { await msg(`${name} is too hurt for that!`); return; }
+      m.hp -= cost; const h = heroPos(state.party.indexOf(m)); float(h.x, h.y - 14 * BS(), '-' + cost, '#ff9a9a');
+    }
     m.fp -= sk.fp;
     await castEffect(m, `${name}: ${sk.name}!`, sk, a.target, s, 1);
     return;
@@ -1043,20 +1095,53 @@ async function castEffect(m, label, eff, target, s, mode) {
   bfx(hp.x, hp.y - 12, ELEM_COL[eff.elem] || '#fff', 16, 1.4, 0.6);
   await sleep(420);
   if (eff.type === 'dmg') {
-    const targets = target === 'all' ? B.enemies.filter((e) => e.alive) : [retarget(target)].filter(Boolean);
+    const all = target === 'all', alive = () => B.enemies.filter((e) => e.alive);
+    const targets = all ? alive() : [retarget(target)].filter(Boolean);
     const tr = trinketOf(m), tm = mode === 1 && tr && tr.skillMul ? tr.skillMul : 1;
-    const base = (eff.power + s.atk * buffMul(m, 'atk') * 0.3 + m.lv * (mode === 2 ? 2.5 : 1.5)) * tm;
-    targets.forEach((t) => { const p = enemyHit(t); elemFx(p.x, p.y, eff.elem, mode === 2); });
-    sfx(eff.elem === 'ember' ? 'fire' : eff.elem === 'gale' ? 'gust' : 'bloom');
-    if (mode === 2) B.shake = 350;
-    await sleep(380);
-    for (const t of targets) {
+    const base = (eff.phys ? eff.power + s.atk * buffMul(m, 'atk') * 0.9 + m.lv * 1.2 : eff.power + s.atk * buffMul(m, 'atk') * 0.3 + m.lv * (mode === 2 ? 2.5 : 1.5)) * tm;
+    const hits = eff.hits || 1;
+    const sound = () => sfx(eff.phys && !eff.elem ? 'hit' : eff.elem === 'ember' ? 'fire' : eff.elem === 'gale' ? 'gust' : 'bloom');
+    if (hits === 1) { targets.forEach((t) => { const p = enemyHit(t); if (eff.elem) elemFx(p.x, p.y, eff.elem, mode === 2); else anim('slash', p.x, p.y, BS(), 45); }); sound(); if (mode === 2) B.shake = 350; await sleep(380); }
+    let total = 0;
+    for (let h = 0; h < (hits === 1 ? targets.length : hits); h++) {
+      const t = hits === 1 ? targets[h] : all ? pick(alive()) : retarget(targets[0]);
+      if (!t || !t.alive) break;
+      if (hits > 1) { const p = enemyHit(t); if (eff.elem) elemFx(p.x, p.y, eff.elem, false); else anim('slash', p.x, p.y, BS(), 40); sound(); await sleep(150); }
       const mul = elemMul(t, eff.elem);
-      await hitEnemy(t, Math.max(1, Math.round((base * mul - t.def * 0.3) * rand(0.9, 1.1))), mul > 1 ? 'Weak!' : mul < 1 ? 'Resisted' : null);
+      let dmg = (base * mul * dmgMul(m, t) - defOf(t) * (eff.phys ? 0.5 : 0.3)) * rand(0.9, 1.1), note = mul > 1 ? 'Weak!' : mul < 1 ? 'Resisted' : null;
+      if (eff.crit) { dmg *= 1.5; note = 'Critical!'; sfx('crit'); B.shake = 200; }
+      dmg = Math.max(1, Math.round(dmg)); total += dmg;
+      await hitEnemy(t, dmg, note);
+      if (eff.steal && !t.robbed) {
+        t.robbed = true; const g = ri(4, 9) + Math.round(t.d.gold * 0.6); state.gold += g;
+        const p = enemyHit(t); float(p.x, p.y - 26, `+${g} coins`, COL.gold);
+        if (Math.random() < 0.3) { const it = pick(['herb', 'tea']); addItem(it); await msg(`${hname(m)} swiped ${g} coins and a ${ITEMS[it].name}!`, 300); }
+        else await msg(`${hname(m)} swiped ${g} coins!`, 250);
+      }
     }
+    if (eff.drain && total > 0 && m.hp > 0) healHero(m, Math.round(total * 0.5), true);
+  } else if (eff.type === 'taunt') {
+    sfx('heal'); B.taunt = { id: m.id, n: 3 }; (B.buffs[m.id] = B.buffs[m.id] || {}).def = 3;
+    const h = heroPos(state.party.indexOf(m)); float(h.x, h.y - 14 * BS(), 'TAUNT', COL.gold); bfx(h.x, h.y - 10, '#c8e0ff', 14);
+    await msg(`${hname(m)} draws the enemies' attention!`, 250);
+  } else if (eff.type === 'debuff') {
+    const t = retarget(target);
+    if (t) {
+      t.debuff = { def: 3 }; state.known[t.id] = true; sfx('crit');
+      const p = enemyHit(t); float(p.x, p.y - 16, 'DEF ↓', '#ff9a6a'); bfx(p.x, p.y, '#ff9a6a', 14);
+      await msg(`${t.name} is marked! Weak to ${ELEM_NAME[t.d.weak]}.`, 300);
+    }
+  } else if (eff.type === 'regen') {
+    sfx('heal');
+    for (const p of state.party) if (p.hp > 0) { B.regen[p.id] = { n: 3, k: healMul(m) }; const h = heroPos(state.party.indexOf(p)); float(h.x, h.y - 14 * BS(), 'REGEN', COL.hp); bfx(h.x, h.y - 10, ELEM_COL.bloom, 10); }
+    await msg('Roots of light wrap around the party!', 250);
+  } else if (eff.type === 'aegis') {
+    sfx('heal');
+    for (const p of state.party) if (p.hp > 0) { healHero(p, Math.round(stats(p).hp * 0.4)); (B.buffs[p.id] = B.buffs[p.id] || {}).def = 3; }
+    await msg("The party's defense rose!", 250);
   } else if (eff.type === 'heal') {
     sfx('heal');
-    const amt = eff.power + m.lv * 3;
+    const amt = (eff.power + m.lv * 3) * healMul(m);
     (target === 'all' ? state.party.filter((p) => p.hp > 0) : [target].filter((p) => p.hp > 0)).forEach((t) => healHero(t, Math.round(amt * rand(0.95, 1.05))));
   } else if (eff.type === 'fullheal') {
     sfx('heal');
@@ -1064,7 +1149,7 @@ async function castEffect(m, label, eff, target, s, mode) {
   } else if (eff.type === 'buff') {
     sfx('heal');
     for (const p of state.party) if (p.hp > 0) { (B.buffs[p.id] = B.buffs[p.id] || {})[eff.stat] = 3; const h = heroPos(state.party.indexOf(p)); float(h.x, h.y - 14 * BS(), eff.stat.toUpperCase() + ' ↑', COL.gold); bfx(h.x, h.y - 10, ELEM_COL[eff.elem], 10); }
-    await msg(eff.stat === 'atk' ? "The party's attack rose!" : "The party's defense rose!", 250);
+    await msg(eff.stat === 'atk' ? "The party's attack rose!" : eff.stat === 'eva' ? 'Smoke hides the party!' : "The party's defense rose!", 250);
   } else if (eff.type === 'revive') {
     if (target.hp <= 0) { sfx('heal'); target.hp = Math.ceil(stats(target).hp / 2); const h = heroPos(state.party.indexOf(target)); bfx(h.x, h.y - 10, '#ffffff', 20); await msg(`${hname(target)} is back on their feet!`, 300); }
   }
@@ -1077,20 +1162,23 @@ async function enemyAct(e) {
   e.lunge = 300;
   if (art) {
     B.msg = `${e.name}: ${art.name}!`; sfx('magic'); await sleep(420);
-    const tg = art.target === 'all' ? targets : [pick(targets)];
+    const tg = art.target === 'all' ? targets : [enemyTarget(targets)];
     tg.forEach((t) => { const h = heroPos(state.party.indexOf(t)); elemFx(h.x, h.y - 10, art.elem); });
     sfx('hit'); await sleep(280);
     let total = 0;
     for (const t of tg) {
+      if (dodges(t)) { const h = heroPos(state.party.indexOf(t)); float(h.x, h.y - 14 * BS(), 'Miss', '#c8e8ff'); continue; }
       const st = stats(t), res = HEROES[t.id].elem === art.elem ? 0.75 : 1;
       const dmg = Math.max(1, Math.round(((art.power + e.atk * 0.4) * res - st.def * buffMul(t, 'def') * 0.3) * rand(0.9, 1.1)));
       total += dmg; await hitHero(t, dmg);
     }
     if (art.drain) { const h = Math.round(total * 0.5); e.hp = Math.min(e.maxhp, e.hp + h); const p = enemyHit(e); float(p.x, p.y - 20, '+' + h, COL.hp); }
   } else {
-    const t = pick(targets);
-    B.msg = `${e.name} attacks ${hname(t)}!`; await sleep(300); sfx('hit');
+    const t = enemyTarget(targets);
+    B.msg = `${e.name} attacks ${hname(t)}!`; await sleep(300);
     const h = heroPos(state.party.indexOf(t));
+    if (dodges(t)) { sfx('cancel'); float(h.x, h.y - 14 * BS(), 'Miss', '#c8e8ff'); await sleep(360); return; }
+    sfx('hit');
     bfx(h.x, h.y - 10, '#ffffff', 10, 1.6);
     await hitHero(t, physDmg(e.atk, stats(t).def * buffMul(t, 'def')));
   }
@@ -1108,7 +1196,7 @@ async function victory() {
       m.xp -= xpNext(m.lv);
       const before = stats(m), old = skillsOf(m); m.lv++;
       const after = stats(m); m.hp += after.hp - before.hp; m.fp += after.fp - before.fp;
-      ups.push(`${hname(m)} reached level ${m.lv}!`);
+      ups.push(`${hname(m)} reached Lv ${m.lv}!  HP +${after.hp - before.hp}  ATK +${after.atk - before.atk}`);
       for (const a of skillsOf(m)) if (!old.includes(a)) ups.push(`${hname(m)} learned ${SKILLS[a].name}!`);
     }
   }
@@ -1176,10 +1264,10 @@ function drawBattleUI() {
   const topMenu = UI.menus[UI.menus.length - 1];
   const showingDesc = topMenu && topMenu.items[topMenu.cursor] && topMenu.items[topMenu.cursor].desc;
   if (B.msg && !B.result && !showingDesc) { box(4, 3, W - 92, 24); font(9); text(B.msg, 11, 17); }
-  const py0 = H - 47, narrow = B.active >= 0 || UI.menus.length > 0;
-  box(2, py0 - 3, narrow ? 136 : W - 4, 50);
+  const four = state.party.length > 3, py0 = H - (four ? 54 : 47), narrow = B.active >= 0 || UI.menus.length > 0;
+  box(2, py0 - 3, narrow ? 136 : W - 4, four ? 57 : 50);
   state.party.forEach((m, i) => {
-    const s = stats(m), y = py0 + 5 + i * 13, act = B.active === i;
+    const rh = four ? 12 : 13, s = stats(m), y = py0 + (four ? 2 : 5) + i * rh, act = B.active === i;
     if (act) { ctx.fillStyle = 'rgba(240,103,51,0.16)'; ctx.fillRect(6, y - 1, 128, 12); }
     font(9, true); text(hname(m), 8, y + 8, m.hp <= 0 ? COL.red : act ? COL.gold : COL.text);
     font(7); text('Lv' + m.lv, 40, y + 8, COL.dim);
@@ -1206,7 +1294,7 @@ function drawBattleUI() {
 // ===================== FIELD MENUS =====================
 function drawPartySummary() {
   rc(0, 0, W, H, 'rgba(8,4,18,0.6)');
-  const ch = Math.min(52, Math.floor((H - 34) / 3) - 2);
+  const ch = Math.min(52, Math.floor((H - 34) / Math.max(3, state.party.length)) - 3);
   state.party.forEach((m, i) => {
     const s = stats(m), y = 4 + i * (ch + 3), x = 4, w = 188;
     box(x, y, w, ch);
@@ -1254,12 +1342,17 @@ async function statusPage() {
       { const pt = ART.portrait(L); ctx.drawImage(pt.big || pt, 12, 12, 76, 76); }
       font(14, true); text(hname(m), 140, 26, COL.gold);
       font(9); text(`Level ${m.lv} ${HEROES[m.id].role}`, 140, 40, COL.text); text(`${ELEM_NAME[HEROES[m.id].elem]} element`, 140, 52, ELEM_TEXT[HEROES[m.id].elem]);
-      text(`Next level in ${xpNext(m.lv) - m.xp} XP`, 140, 64, COL.dim);
+      text(`Next level in ${xpNext(m.lv) - m.xp} XP`, 140, 64, COL.dim); bar(140, 68, W - 156, 3, m.xp, xpNext(m.lv), '#a060e0');
       [['HP', `${m.hp} / ${s.hp}`], ['FP', `${m.fp} / ${s.fp}`], ['Attack', s.atk], ['Defense', s.def], ['Agility', s.agi]]
         .forEach(([k, v], r) => { text(k, 16, 96 + r * 13, COL.dim); text(String(v), 130, 96 + r * 13, COL.text, 'right'); });
       const t = trinketOf(m);
       [['Weapon', m.weapon ? ITEMS[m.weapon].name : '—'], ['Armor', m.armor ? ITEMS[m.armor].name : '—'], ['Trinket', t ? t.name : '—'], ['Burst', BURSTS[HEROES[m.id].burst].name], ['Field tool', POWERS[HEROES[m.id].field].name]]
         .forEach(([k, v], r) => { text(k, 146, 96 + r * 13, COL.dim); text(String(v), W - 14, 96 + r * 13, COL.text, 'right'); });
+      const hd = HEROES[m.id], py = 96 + 5 * 13 + 6;
+      font(8, true); text(`Passive · ${hd.passive.name}`, 16, py, '#8a4ab0'); font(8); wrap(hd.passive.desc, W - 32).forEach((l, r) => text(l, 16, py + 11 + r * 10, COL.text));
+      font(8, true); text('Skills', 16, py + 36, COL.gold);
+      font(8); hd.skills.forEach(([id, lv], r) => { const got = m.lv >= lv; text(SKILLS[id].name, 16 + (r % 2) * 130, py + 47 + Math.floor(r / 2) * 11, got ? COL.text : COL.dim); if (!got) text('Lv ' + lv, 16 + (r % 2) * 130 + 120, py + 47 + Math.floor(r / 2) * 11, COL.dim, 'right'); });
+      font(8); wrap(hd.bio, W - 32).forEach((l, r) => text(l, 16, py + 86 + r * 10, COL.dim));
       font(8); text(state.party.length > 1 ? 'Tap a side or press ◀ ▶ to switch hero · B to close' : 'B to close', W / 2, H - 12, COL.dim, 'center');
       hits.push({ x: 0, y: 0, w: W / 2, h: H - 24, fn: () => inputQ.push('left') });
       hits.push({ x: W / 2, y: 0, w: W / 2, h: H - 24, fn: () => inputQ.push('right') });
@@ -1316,7 +1409,7 @@ async function fieldSkillsMenu() {
     const t = await chooseMember(`${sk.name} on:`, (p) => `${p.hp}/${stats(p).hp}`, (p) => (dead ? p.hp <= 0 : p.hp > 0), { x: 150 });
     if (!t) { if (dead) toast('Nobody needs reviving.'); continue; }
     m.fp -= sk.fp; sfx('heal');
-    if (dead) t.hp = Math.ceil(stats(t).hp / 2); else t.hp = Math.min(stats(t).hp, t.hp + sk.power + m.lv * 3);
+    if (dead) t.hp = Math.ceil(stats(t).hp / 2); else t.hp = Math.min(stats(t).hp, t.hp + Math.round((sk.power + m.lv * 3) * healMul(m)));
     toast(`${hname(t)} feels better.`);
   }
 }
@@ -1467,6 +1560,39 @@ function renderEnding() {
   }
   ctx.globalAlpha = 1;
 }
+// ---------- class selection ----------
+async function chooseClass() {
+  let hover = 0;
+  const prev = UI.panel;
+  const MAX = { hp: 44, fp: 22, atk: 13, def: 11, agi: 14 };
+  UI.panel = () => {
+    rc(0, 0, W, H, 'rgba(8,4,18,0.82)');
+    const k = CLASS_ORDER[hover], c = CLASSES[k], ph = H - 84;
+    box(4, 4, W - 8, ph);
+    font(11, true); text("Choose Wren's class", W / 2, 20, COL.gold, 'center');
+    const pt = W3D.portrait(k + ':wren'); ctx.drawImage(pt.big || pt, 10, 26, 76, 76);
+    font(14, true); text(c.name, 94, 42, COL.text);
+    font(8); text(`${ELEM_NAME[c.elem]} element`, 94, 54, ELEM_TEXT[c.elem]);
+    font(8); wrap(c.blurb, W - 106).forEach((l, i) => text(l, 94, 68 + i * 10, COL.text));
+    const st = [['HP', 'hp'], ['FP', 'fp'], ['Attack', 'atk'], ['Defense', 'def'], ['Agility', 'agi']];
+    st.forEach(([lab, key], i) => { const y = 112 + i * 11; font(8); text(lab, 12, y, COL.dim); bar(56, y - 5, 80, 4, c.base[key], MAX[key], ['#5ac85a', '#5a9af0', '#f07a4a', '#c8a050', '#7ad0d0'][i]); });
+    font(8, true); text('Skills', 146, 108, COL.gold);
+    font(8); c.skills.slice(0, 6).forEach(([id, lv], i) => text(`${SKILLS[id].name}${lv > 1 ? '  (Lv ' + lv + ')' : ''}`, 146, 119 + i * 10, COL.text));
+    const py = 172;
+    font(8, true); text(`Passive: ${c.passive.name}`, 12, py, '#8a4ab0'); font(8); wrap(c.passive.desc, W - 28).forEach((l, i) => text(l, 12, py + 11 + i * 10, COL.text));
+    font(8, true); text(`Burst: ${BURSTS[c.burst].name}`, 12, py + 36, COL.gold); font(8); wrap(BURSTS[c.burst].desc, W - 28).forEach((l, i) => text(l, 12, py + 47 + i * 10, COL.text));
+    if (ph > 250) { font(8); wrap('Your three companions will each be a different class, so the party always has every element and a healer.', W - 28).forEach((l, i) => text(l, 12, py + 76 + i * 10, COL.dim)); }
+  };
+  let picked = null;
+  while (!picked) {
+    const j = await choose(CLASS_ORDER.map((k) => ({ label: CLASSES[k].name, color: ELEM_TEXT[CLASSES[k].elem] })), { x: 6, bottom: H - 6, w: W - 12, cols: 3, max: 2, cursor: hover, cancel: false, onHover: (i) => (hover = i) });
+    hover = j;
+    const ok = await choose([`Begin as a ${CLASSES[CLASS_ORDER[j]].name}`, 'Look again'], { x: W / 2 - 70, bottom: H - 6, w: 140 });
+    if (ok === 0) picked = CLASS_ORDER[j];
+  }
+  UI.panel = prev;
+  return picked;
+}
 async function titleScreen() {
   game.scene = 'title'; music('title');
   UI.fadeTo = 0;
@@ -1492,6 +1618,9 @@ async function titleScreen() {
     await fade(0);
     await say('Mossbell Vale has always bloomed. Beneath the old hill, the Rootwell spring hums a quiet song, and wherever its water flows, flowers follow.');
     await say('But three days ago, the humming stopped. And the petals began to turn gray...');
+    await say('In the village of Mossbell, a young cartographer named Wren is about to set out to find out why.');
+    startParty(await chooseClass());
+    await say(`Wren is a ${HEROES.wren.role}! Companions will join along the way, each with a different class.`);
     await fade(1);
     titleBuilt = false; loadMap('village'); placePlayer(12, 13, 'down');
     game.scene = 'map';

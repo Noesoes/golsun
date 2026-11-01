@@ -5,49 +5,119 @@ const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
 const ELEM_COL = { gale: '#8ff0c8', ember: '#ff9040', bloom: '#9ae86a', hush: '#c0a8f0' };
 const ELEM_NAME = { gale: 'Gale', ember: 'Ember', bloom: 'Bloom', hush: 'Hush' };
 
-const HEROES = {
-  wren: {
-    name: 'Wren', elem: 'gale', field: 'gust', role: 'Cartographer',
-    look: { sheet: 'wren' },
-    base: { hp: 32, fp: 14, atk: 10, def: 6, agi: 10 }, grow: { hp: 6, fp: 3, atk: 2.2, def: 1.4, agi: 1.6 },
-    skills: [['gustedge', 1], ['tailwind', 2], ['cyclone', 3], ['galelance', 5], ['tempest', 7]], burst: 'skyrend',
-  },
-  bram: {
-    name: 'Bram', elem: 'ember', field: 'kindle', role: 'Blacksmith',
-    look: { sheet: 'bram' },
-    base: { hp: 40, fp: 10, atk: 12, def: 8, agi: 6 }, grow: { hp: 7.5, fp: 2.2, atk: 2.6, def: 1.8, agi: 1 },
-    skills: [['cinder', 1], ['firstaid', 1], ['ironhide', 2], ['flamewall', 3], ['forgeburst', 5]], burst: 'starforge',
-  },
-  tamsin: {
-    name: 'Tamsin', elem: 'bloom', field: 'bloom', role: 'Botanist',
-    look: { sheet: 'tamsin' },
-    base: { hp: 28, fp: 18, atk: 8, def: 5, agi: 9 }, grow: { hp: 5.2, fp: 3.6, atk: 1.8, def: 1.2, agi: 1.4 },
-    skills: [['mendpetal', 1], ['thornsnare', 1], ['blossomrain', 3], ['reviveseed', 4], ['briarstorm', 6]], burst: 'verdant',
-  },
+// ---------- characters & classes ----------
+// The four heroes keep their personality and field tool; their class decides stats, skills, Burst, passive and look.
+const CHARS = {
+  wren: { name: 'Wren', field: 'gust', bio: 'A young cartographer from Mossbell, carrying her mother\'s gale gauntlet.', tint: 0xfff6ee },
+  bram: { name: 'Bram', field: 'kindle', bio: 'The village blacksmith\'s apprentice, never without his forge lantern.', tint: 0xffe4cc },
+  corin: { name: 'Corin', field: 'pick', bio: 'A courier for the Larkspur post, with a ring of skeleton keys.', tint: 0xe4ecff },
+  tamsin: { name: 'Tamsin', field: 'bloom', bio: 'A botanist from Larkspur College who studies the Rootwell.', tint: 0xeaffea },
 };
+const CLASSES = {
+  warden: { name: 'Warden', model: 'Knight', elem: 'bloom', blurb: 'A shield-bearer who draws enemy attacks and keeps friends standing.',
+    passive: { name: 'Stalwart', desc: 'Takes 15% less damage.' },
+    base: { hp: 42, fp: 11, atk: 10, def: 11, agi: 6 }, grow: { hp: 8, fp: 2.2, atk: 2.1, def: 2.3, agi: 0.9 },
+    skills: [['shieldbash', 1], ['bulwark', 1], ['rally', 3], ['ironhide', 5], ['thornwall', 7]], burst: 'aegis' },
+  berserker: { name: 'Berserker', model: 'Barbarian', elem: 'ember', blurb: 'Trades safety for raw power, and hits even harder when hurt.',
+    passive: { name: 'Fury', desc: 'Deals 30% more damage while below half HP.' },
+    base: { hp: 44, fp: 9, atk: 13, def: 7, agi: 7 }, grow: { hp: 8, fp: 1.7, atk: 2.8, def: 1.4, agi: 1.1 },
+    skills: [['recklessblow', 1], ['cleave', 1], ['warcry', 3], ['bloodaxe', 5], ['inferno', 7]], burst: 'ragnarok' },
+  mage: { name: 'Mage', model: 'Mage', elem: 'ember', blurb: 'Commands both fire and wind. Fragile, but devastating.',
+    passive: { name: 'Arcane Flow', desc: 'Regains 2 FP at the end of every round.' },
+    base: { hp: 26, fp: 22, atk: 8, def: 4, agi: 9 }, grow: { hp: 4.8, fp: 4.2, atk: 1.6, def: 1, agi: 1.4 },
+    skills: [['firebolt', 1], ['galeblade', 1], ['flamewall', 3], ['cyclone', 5], ['meteor', 7]], burst: 'starfall' },
+  rogue: { name: 'Rogue', model: 'Rogue', elem: 'gale', blurb: 'Quick and sly. Lands critical hits and steals from foes.',
+    passive: { name: 'Opportunist', desc: 'Normal attacks are critical hits 25% of the time.' },
+    base: { hp: 30, fp: 12, atk: 11, def: 6, agi: 14 }, grow: { hp: 5.5, fp: 2.4, atk: 2.3, def: 1.2, agi: 2.2 },
+    skills: [['twinfang', 1], ['pilfer', 1], ['smokeveil', 3], ['shadowstrike', 5], ['galefan', 7]], burst: 'thousandcuts' },
+  ranger: { name: 'Ranger', model: 'Ranger', elem: 'gale', blurb: 'A sharp-eyed archer who marks targets and patches wounds.',
+    passive: { name: 'Keen Eye', desc: 'Sees every foe\'s weakness, and hits marked foes 25% harder.' },
+    base: { hp: 32, fp: 14, atk: 11, def: 6, agi: 11 }, grow: { hp: 6, fp: 2.8, atk: 2.3, def: 1.3, agi: 1.7 },
+    skills: [['aimedshot', 1], ['huntersmark', 1], ['dressing', 2], ['volley', 4], ['stormarrow', 7]], burst: 'skyfall' },
+  druid: { name: 'Druid', model: 'Rogue_Hooded', elem: 'bloom', blurb: 'A healer who speaks with roots and petals.',
+    passive: { name: 'Green Thumb', desc: 'Healing skills restore 25% more.' },
+    base: { hp: 30, fp: 20, atk: 8, def: 6, agi: 9 }, grow: { hp: 5.4, fp: 4, atk: 1.7, def: 1.3, agi: 1.4 },
+    skills: [['mendpetal', 1], ['thornsnare', 1], ['blossomrain', 3], ['regrowth', 4], ['reviveseed', 5], ['briarstorm', 7]], burst: 'verdant' },
+};
+const CLASS_ORDER = ['warden', 'berserker', 'mage', 'rogue', 'ranger', 'druid'];
+const CLASS_ELEMS = { warden: ['bloom'], berserker: ['ember'], mage: ['ember', 'gale'], rogue: ['gale'], ranger: ['gale'], druid: ['bloom'] };
+const CLASS_HEALS = { warden: 1, ranger: 1, druid: 2 };
+// which classes suit each companion best (they never share a class with Wren or each other)
+const CLASS_PREF = {
+  bram: ['warden', 'berserker', 'ranger', 'rogue', 'mage', 'druid'],
+  corin: ['rogue', 'ranger', 'berserker', 'mage', 'warden', 'druid'],
+  tamsin: ['druid', 'mage', 'ranger', 'warden', 'rogue', 'berserker'],
+};
+function assignClasses(playerCls) {
+  const pool = CLASS_ORDER.filter((c) => c !== playerCls), ids = ['bram', 'corin', 'tamsin'];
+  let best = null, bestScore = -1;
+  for (const a of pool) for (const b of pool) for (const c of pool) {
+    if (a === b || b === c || a === c) continue;
+    const pick = [a, b, c], all = [playerCls, ...pick];
+    const els = new Set(all.flatMap((k) => CLASS_ELEMS[k]));
+    const heal = all.reduce((n, k) => n + (CLASS_HEALS[k] || 0), 0);
+    if (!(els.has('ember') && els.has('gale') && els.has('bloom')) || heal < 1) continue; // every party can exploit every weakness and heal
+    const score = pick.reduce((n, k, i) => n + (6 - CLASS_PREF[ids[i]].indexOf(k)) * (i === 2 ? 1.1 : 1), 0) + heal;
+    if (score > bestScore) { bestScore = score; best = pick; }
+  }
+  return { wren: playerCls, bram: best[0], corin: best[1], tamsin: best[2] };
+}
+const HEROES = {};
+function applyClasses(classes) {
+  for (const id in CHARS) {
+    const k = classes[id], c = CLASSES[k], ch = CHARS[id];
+    HEROES[id] = { ...c, name: ch.name, field: ch.field, bio: ch.bio, cls: k, role: c.name, look: { sheet: k + ':' + id } };
+  }
+}
+applyClasses({ wren: 'ranger', bram: 'warden', corin: 'rogue', tamsin: 'druid' });
 
 const SKILLS = {
-  gustedge: { name: 'Gust Edge', elem: 'gale', fp: 3, type: 'dmg', target: 'enemy', power: 20, desc: 'Gale: slice one foe with a blade of wind.' },
-  tailwind: { name: 'Tailwind', elem: 'gale', fp: 5, type: 'buff', stat: 'atk', target: 'allAllies', desc: "Raise the whole party's attack for 3 turns." },
-  cyclone: { name: 'Cyclone', elem: 'gale', fp: 6, type: 'dmg', target: 'allEnemies', power: 22, desc: 'Gale: a whirlwind strikes every foe.' },
-  galelance: { name: 'Gale Lance', elem: 'gale', fp: 7, type: 'dmg', target: 'enemy', power: 50, desc: 'Gale: a piercing spear of wind.' },
-  tempest: { name: 'Tempest', elem: 'gale', fp: 11, type: 'dmg', target: 'allEnemies', power: 46, desc: 'Gale: summon a roaring storm on all foes.' },
-  cinder: { name: 'Cinder Strike', elem: 'ember', fp: 3, type: 'dmg', target: 'enemy', power: 24, desc: 'Ember: a red-hot hammer blow.' },
-  firstaid: { name: 'First Aid', elem: 'ember', fp: 3, type: 'heal', target: 'ally', power: 28, desc: 'Patch up one ally for about 28 HP.' },
-  ironhide: { name: 'Ironhide', elem: 'ember', fp: 5, type: 'buff', stat: 'def', target: 'allAllies', desc: "Raise the whole party's defense for 3 turns." },
-  flamewall: { name: 'Flame Wall', elem: 'ember', fp: 6, type: 'dmg', target: 'allEnemies', power: 22, desc: 'Ember: a wall of fire sweeps all foes.' },
-  forgeburst: { name: 'Forge Burst', elem: 'ember', fp: 7, type: 'dmg', target: 'enemy', power: 56, desc: 'Ember: an explosive strike on one foe.' },
-  mendpetal: { name: 'Mend Petal', elem: 'bloom', fp: 3, type: 'heal', target: 'ally', power: 38, desc: 'Heal one ally for about 38 HP.' },
-  thornsnare: { name: 'Thornsnare', elem: 'bloom', fp: 3, type: 'dmg', target: 'enemy', power: 18, desc: 'Bloom: lash one foe with thorny vines.' },
-  blossomrain: { name: 'Blossom Rain', elem: 'bloom', fp: 8, type: 'heal', target: 'allAllies', power: 32, desc: 'Heal every ally for about 32 HP.' },
+  // Warden
+  shieldbash: { name: 'Shield Bash', fp: 2, type: 'dmg', phys: true, target: 'enemy', power: 16, desc: 'Slam one foe with your shield.' },
+  bulwark: { name: 'Bulwark', fp: 4, type: 'taunt', target: 'self', desc: 'Raise your shield: foes target you for 3 turns, and your defense rises.' },
+  rally: { name: 'Rally', elem: 'bloom', fp: 6, type: 'heal', target: 'allAllies', power: 18, desc: 'Steady the party: heal everyone a little.' },
+  ironhide: { name: 'Ironhide', elem: 'bloom', fp: 5, type: 'buff', stat: 'def', target: 'allAllies', desc: "Raise the whole party's defense for 3 turns." },
+  thornwall: { name: 'Thornwall', elem: 'bloom', fp: 10, type: 'dmg', target: 'allEnemies', power: 40, desc: 'Bloom: a wall of thorns erupts under every foe.' },
+  // Berserker
+  recklessblow: { name: 'Reckless Blow', fp: 0, hpCost: 0.12, type: 'dmg', phys: true, target: 'enemy', power: 34, desc: 'A huge swing that costs 12% of your HP instead of FP.' },
+  cleave: { name: 'Cleave', fp: 4, type: 'dmg', phys: true, target: 'allEnemies', power: 10, desc: 'One wide swing that hits every foe.' },
+  warcry: { name: 'War Cry', elem: 'ember', fp: 5, type: 'buff', stat: 'atk', target: 'allAllies', desc: "Raise the whole party's attack for 3 turns." },
+  bloodaxe: { name: 'Blood Axe', elem: 'ember', fp: 6, type: 'dmg', drain: true, target: 'enemy', power: 34, desc: 'Ember: a burning axe that heals you for half the damage.' },
+  inferno: { name: 'Inferno', elem: 'ember', fp: 10, type: 'dmg', target: 'allEnemies', power: 44, desc: 'Ember: set the whole battlefield ablaze.' },
+  // Mage
+  firebolt: { name: 'Firebolt', elem: 'ember', fp: 3, type: 'dmg', target: 'enemy', power: 25, desc: 'Ember: hurl a bolt of fire at one foe.' },
+  galeblade: { name: 'Gale Blade', elem: 'gale', fp: 3, type: 'dmg', target: 'enemy', power: 23, desc: 'Gale: slice one foe with a blade of wind.' },
+  flamewall: { name: 'Flame Wall', elem: 'ember', fp: 6, type: 'dmg', target: 'allEnemies', power: 25, desc: 'Ember: a wall of fire sweeps all foes.' },
+  cyclone: { name: 'Cyclone', elem: 'gale', fp: 6, type: 'dmg', target: 'allEnemies', power: 25, desc: 'Gale: a whirlwind strikes every foe.' },
+  meteor: { name: 'Meteor', elem: 'ember', fp: 12, type: 'dmg', target: 'allEnemies', power: 54, desc: 'Ember: call down a falling star on every foe.' },
+  // Rogue
+  twinfang: { name: 'Twin Fang', fp: 3, type: 'dmg', phys: true, hits: 2, target: 'enemy', power: 10, desc: 'Strike one foe twice in a blink.' },
+  pilfer: { name: 'Pilfer', fp: 2, type: 'dmg', phys: true, steal: true, target: 'enemy', power: 8, desc: 'Strike and swipe coins, or sometimes an item.' },
+  smokeveil: { name: 'Smoke Veil', elem: 'gale', fp: 5, type: 'buff', stat: 'eva', target: 'allAllies', desc: 'Foes often miss the party for 3 turns.' },
+  shadowstrike: { name: 'Shadowstrike', fp: 6, type: 'dmg', phys: true, crit: true, target: 'enemy', power: 30, desc: 'A strike from the shadows that always lands a critical hit.' },
+  galefan: { name: 'Gale Fan', elem: 'gale', fp: 9, type: 'dmg', target: 'allEnemies', power: 40, desc: 'Gale: fling a fan of wind-blades at every foe.' },
+  // Ranger
+  aimedshot: { name: 'Aimed Shot', elem: 'gale', fp: 3, type: 'dmg', target: 'enemy', power: 26, desc: 'Gale: a carefully aimed, wind-guided arrow.' },
+  huntersmark: { name: "Hunter's Mark", fp: 2, type: 'debuff', target: 'enemy', desc: 'Mark one foe: its defense drops for 3 turns.' },
+  dressing: { name: 'Field Dressing', elem: 'bloom', fp: 4, type: 'heal', target: 'ally', power: 30, desc: 'Bandage one ally for about 30 HP.' },
+  volley: { name: 'Volley', elem: 'gale', fp: 6, type: 'dmg', hits: 4, target: 'allEnemies', power: 15, desc: 'Gale: loose four arrows at random foes.' },
+  stormarrow: { name: 'Storm Arrow', elem: 'gale', fp: 10, type: 'dmg', target: 'allEnemies', power: 44, desc: 'Gale: an arrow that bursts into a storm over all foes.' },
+  // Druid
+  mendpetal: { name: 'Mend Petal', elem: 'bloom', fp: 3, type: 'heal', target: 'ally', power: 36, desc: 'Heal one ally for about 36 HP.' },
+  thornsnare: { name: 'Thornsnare', elem: 'bloom', fp: 3, type: 'dmg', target: 'enemy', power: 20, desc: 'Bloom: lash one foe with thorny vines.' },
+  blossomrain: { name: 'Blossom Rain', elem: 'bloom', fp: 8, type: 'heal', target: 'allAllies', power: 30, desc: 'Heal every ally for about 30 HP.' },
+  regrowth: { name: 'Regrowth', elem: 'bloom', fp: 7, type: 'regen', target: 'allAllies', desc: 'Every ally recovers 10% HP each round for 3 rounds.' },
   reviveseed: { name: 'Revive Seed', elem: 'bloom', fp: 10, type: 'revive', target: 'deadAlly', desc: 'Revive a fallen ally with half HP.' },
   briarstorm: { name: 'Briar Storm', elem: 'bloom', fp: 11, type: 'dmg', target: 'allEnemies', power: 44, desc: 'Bloom: a storm of briars hits all foes.' },
 };
 // Bursts: powerful moves that spend the party's full Harmony gauge.
 const BURSTS = {
-  skyrend: { name: 'Skyrend', elem: 'gale', type: 'dmg', target: 'allEnemies', power: 78, desc: 'Wren tears the sky open over every foe.' },
-  starforge: { name: 'Starforge Hammer', elem: 'ember', type: 'dmg', target: 'enemy', power: 135, desc: 'Bram brings down a hammer of white-hot starmetal.' },
-  verdant: { name: 'Verdant Chorus', elem: 'bloom', type: 'fullheal', target: 'allAllies', desc: 'Tamsin fully heals and revives the whole party.' },
+  aegis: { name: 'Aegis', elem: 'bloom', type: 'aegis', target: 'allAllies', desc: 'Heal every ally 40% and raise their defense for 3 turns.' },
+  ragnarok: { name: 'Ragnarok', elem: 'ember', type: 'dmg', phys: true, target: 'allEnemies', power: 80, desc: 'A world-splitting blow of fire on every foe.' },
+  starfall: { name: 'Starfall', elem: 'ember', type: 'dmg', target: 'allEnemies', power: 86, desc: 'Rain burning stars down on every foe.' },
+  thousandcuts: { name: 'Thousand Cuts', elem: 'gale', type: 'dmg', phys: true, hits: 8, target: 'allEnemies', power: 20, desc: 'Eight lightning-fast strikes at random foes.' },
+  skyfall: { name: 'Skyfall', elem: 'gale', type: 'dmg', target: 'allEnemies', power: 80, desc: 'A storm of arrows falls on every foe.' },
+  verdant: { name: 'Verdant Chorus', elem: 'bloom', type: 'fullheal', target: 'allAllies', desc: 'Fully heal and revive the whole party.' },
 };
 // Trinkets: hidden charms. Each hero can wear one.
 const TRINKETS = {
@@ -85,7 +155,7 @@ const ENEMIES = {
     arts: [{ name: 'Silent Shriek', elem: 'hush', power: 10, target: 'all', chance: 0.25 }] },
   hushling: { name: 'Hushbones', shape: 'ghost', hp: 38, atk: 17, def: 7, agi: 12, xp: 24, gold: 14, weak: 'ember', resist: 'bloom', float: true,
     arts: [{ name: 'Chill Whisper', elem: 'hush', power: 14, target: 'one', chance: 0.3 }] },
-  queen: { name: 'Hush Wyrm', shape: 'wraith', hp: 520, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
+  queen: { name: 'Hush Wyrm', shape: 'wraith', hp: 640, atk: 26, def: 14, agi: 12, xp: 300, gold: 200, weak: 'ember', resist: 'gale', boss: true, twice: true, float: true,
     arts: [{ name: 'Mournful Wail', elem: 'hush', power: 20, target: 'all', chance: 0.3 }, { name: 'Hush Drain', elem: 'hush', power: 32, target: 'one', chance: 0.3, drain: true }] },
 };
 const ENCOUNTERS = {
@@ -95,9 +165,10 @@ const ENCOUNTERS = {
 
 // ---------- people (dialog speakers & NPC looks) ----------
 const PEOPLE = {
-  wren: { name: 'Wren', look: HEROES.wren.look },
-  bram: { name: 'Bram', look: HEROES.bram.look },
-  tamsin: { name: 'Tamsin', look: HEROES.tamsin.look },
+  wren: { name: 'Wren', get look() { return HEROES.wren.look; } },
+  bram: { name: 'Bram', get look() { return HEROES.bram.look; } },
+  corin: { name: 'Corin', get look() { return HEROES.corin.look; } },
+  tamsin: { name: 'Tamsin', get look() { return HEROES.tamsin.look; } },
   gran: { name: 'Gran Hesper', look: { sheet: 'gran' } },
   pell: { name: 'Pell', look: { sheet: 'pell' } },
   rosa: { name: 'Rosa', look: { sheet: 'rosa' } },
@@ -155,6 +226,8 @@ const MAPS = {
     signs: { '27,11': 'East: Windmere Fields.\nBeyond them, in the cliffs: Whisper Grotto.' },
     trinkets: [{ id: 'foxbell', x: 26, y: 22 }],
     npcs: [
+      { id: 'bram_v', x: 13, y: 13, who: 'bram', dir: 'left', cond: () => !state.flags.metGran && !state.flags.bramJoined,
+        talk: async () => { await say("Gran's cottage is the red-roofed one up the path to the northwest. I'll meet you there!", 'bram'); } },
       { id: 'pell1', x: 28, y: 12, who: 'pell', dir: 'left', cond: () => !state.flags.metGran,
         talk: async () => { await say("Morning, Wren! Your gran was asking after you. Best go see her before you wander off. Her cottage is the red-roofed one to the northwest.", 'pell'); } },
       { id: 'pell2', x: 27, y: 13, who: 'pell', dir: 'left', cond: () => !!state.flags.metGran,
@@ -184,7 +257,7 @@ const MAPS = {
         state.flags.intro = true;
         await say("Wren! There you are. Your gran's been looking for you all morning.", 'bram');
         await say("Something's wrong with the flowers. Even the bees won't leave their hives. Come on, her cottage is just up the path to the northwest!", 'bram');
-        await say("(Move with the D-pad, or tap where you want to go. Press A, or tap people and things, to interact.)");
+        await say("(Move with the analog stick, or tap where you want to go. Press A, or tap people and things, to interact.)");
       }
     },
   },
@@ -193,7 +266,8 @@ const MAPS = {
     name: "Gran's Cottage", ground: 'W', music: 'village', interior: true,
     rows: ['QQQQQQQQQQ', 'QYYWWWWeWQ', 'QWWWggWWWQ', 'QqWkggWWWQ', 'QWWWggWWqQ', 'QWWWWWWWWQ', 'QWWWWWWWWQ', 'QQQQXQQQQQ'],
     warps: [{ x: 4, y: 7, to: 'village', tx: 5, ty: 7, dir: 'down' }],
-    npcs: [{ id: 'gran', x: 6, y: 3, who: 'gran', dir: 'down', talk: async () => granScript() }],
+    npcs: [{ id: 'gran', x: 6, y: 3, who: 'gran', dir: 'down', talk: async () => granScript() },
+      { id: 'bram_g', x: 3, y: 4, who: 'bram', dir: 'right', cond: () => !state.flags.bramJoined, talk: async () => granScript() }],
   },
   inn: {
     name: 'The Sleepy Kettle', ground: 'W', music: 'village', interior: true,
@@ -215,7 +289,7 @@ const MAPS = {
       'TMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMTT',
       'TMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMTT',
       'TMMMMMMMMMMMMMMM~~MMMMMMMMMvMMMMTT',
-      'TT.T....T.....,.~~.........=....TT',
+      'TT.T.J..T.....,.~~.........=....TT',
       'TT."""""""..T...~~r.""""...=...TTT',
       'T.."""""""......~~..""""."""""..TT',
       'T..""""""".r....~~.."""".""""".CTT',
@@ -245,9 +319,11 @@ const MAPS = {
       '2,10': 'West: Mossbell Village.\nNortheast: Whisper Grotto.',
       '26,12': 'Whisper Grotto: straight north.\nThe Rootwell spring rises within.',
     },
-    chests: { '31,6': { item: 'herb', n: 2 }, '5,18': { item: 'tea', n: 2 }, '27,20': { item: 'salts', n: 1 } },
+    chests: { '31,6': { item: 'herb', n: 2 }, '5,18': { item: 'tea', n: 2 }, '27,20': { item: 'salts', n: 1 }, '5,3': { gold: 150, locked: true } },
     trinkets: [{ id: 'thimble', x: 7, y: 17 }],
+    onStep: (x, y) => (!state.flags.corinJoined && x >= 24 && y <= 10 ? corinScript : null),
     npcs: [
+      { id: 'corin', x: 29, y: 9, who: 'corin', dir: 'left', cond: () => !state.flags.corinJoined, talk: async () => corinScript() },
       { id: 'odo', x: 21, y: 10, who: 'odo', dir: 'left',
         talk: async () => {
           await say("The river's too wide to wade and too cold to swim. I hear the botanists at Larkspur grow lily pads big enough to walk on. Wouldn't that be something?", 'odo');
@@ -286,7 +362,7 @@ const MAPS = {
       '###########P############',
       '###########_############',
       '###########O############',
-      '#####z_____________#####',
+      '#####z___________J_#####',
       '####__C_____________####',
       '####__r____________m####',
       '####________________####',
@@ -295,7 +371,7 @@ const MAPS = {
       '###########X############',
     ],
     warps: [{ x: 11, y: 25, to: 'field', tx: 27, ty: 3, dir: 'down' }],
-    chests: { '6,20': { item: 'herb', n: 2 }, '16,13': { item: 'sunberry', n: 1 } },
+    chests: { '6,20': { item: 'herb', n: 2 }, '16,13': { item: 'sunberry', n: 1 }, '17,19': { item: 'sunberry', n: 2, locked: true } },
     trinkets: [{ id: 'owlquill', x: 3, y: 6 }, { id: 'mosslocket', x: 22, y: 11 }],
     npcs: [
       { id: 'tamsin', x: 2, y: 11, who: 'tamsin', dir: 'right', cond: () => !state.flags.tamsinJoined, talk: async () => tamsinScript() },
@@ -331,7 +407,9 @@ async function granScript() {
     await say("I thought you might say that. Then take this. It's your mother's old gale gauntlet. One good gust from it will push a boulder like a pebble.", 'gran');
     sfx('chest');
     await say("Wren received the Gale Gauntlet! (Face a boulder and press A, or ✦, to Gust it.)");
-    await say("And I've got my forge lantern. Brambles, meet fire.", 'bram');
+    await say("And I've got my forge lantern. Brambles, meet fire. You're not going alone, Wren.", 'bram');
+    await joinParty('bram');
+    await say("(Bram can Kindle brambles with his lantern. Each hero's class gives them their own skills in battle; check them in the menu.)");
     await say("Here's a little coin and some herbs for the road. The grotto is east, past Windmere Fields. Come home safe, you two.", 'gran');
     state.gold += 60; addItem('herb', 2); sfx('chest');
     await say('Received 60 coins and 2 Herbs!');
@@ -348,12 +426,29 @@ async function tamsinScript() {
   await say("Strange gray bats have been swarming toward the spring for days, and the air down here has gone so cold. Something is feeding on the spring's song.", 'tamsin');
   await say("We're heading there now. Come with us?", 'wren');
   await say("Gladly! And I can help: my lilypad seeds grow pads big enough to walk on. That underground river won't stop us!", 'tamsin');
-  const lv = Math.max(...state.party.map((m) => m.lv));
-  state.party.push(makeMember('tamsin', lv));
-  state.flags.tamsinJoined = true;
-  syncNpcs(); sfx('level'); goalChanged();
-  await say('Tamsin joined the party!');
+  await joinParty('tamsin');
   await say('(Face the river and press A to plant lily pads across it.)');
+}
+async function joinParty(id) {
+  const lv = Math.max(...state.party.map((m) => m.lv));
+  state.party.push(makeMember(id, lv));
+  state.flags[id + 'Joined'] = true;
+  syncNpcs(); sfx('level'); goalChanged();
+  const h = HEROES[id];
+  await say(`${h.name} joined the party! ${h.name} is a ${h.role}. ${h.blurb}`);
+}
+async function corinScript() {
+  if (state.flags.corinJoined) return;
+  P.path = []; await sleep(200);
+  await say('Hey! You there! A little help?!', 'corin', '???');
+  await say("These wasps have been chasing me since the bridge, and they are NOT interested in negotiating!", 'corin', '???');
+  const r = await fight(['wasp', 'wasp']);
+  if (r !== 'win') return;
+  await say("Phew. Thank you! I owe you one. Two, actually. Possibly three.", 'corin');
+  await say("Corin Ashdown, courier for the Larkspur post. I was carrying letters to the college, but every road out of the Vale has gone gray and strange.", 'corin');
+  await say("You're heading for Whisper Grotto? Then I'm coming. Couriers go where the trouble is. That's where the interesting letters come from.", 'corin');
+  await joinParty('corin');
+  await say("And these might come in handy: skeleton keys. There isn't a lock in the Vale I can't open. (Face a locked chest and press A.)", 'corin');
 }
 async function bossScript() {
   if (state.flags.bossDead) return;
@@ -373,7 +468,7 @@ async function bossScript() {
 function goalText() {
   const f = state.flags;
   if (!f.metGran) return "Visit Gran's cottage (northwest)";
-  if (!f.grottoIntro) return 'Go east through Windmere Fields to Whisper Grotto';
+  if (!f.grottoIntro) return f.corinJoined ? 'Head north to Whisper Grotto' : 'Go east through Windmere Fields to Whisper Grotto';
   if (!f.tamsinJoined) return 'Explore Whisper Grotto';
   if (!f.bossDead) return 'Cross the river and reach the Rootwell';
   if (!f.springSings) return 'Wake the Rootwell spring';
