@@ -657,7 +657,7 @@ function facingTarget() {
   if (!n && c === 'K') { n = npcAt(x + dx, y + dy); if (n) return { kind: 'talk', n, x: x + dx, y: y + dy }; }
   if (n) return { kind: 'talk', n, x, y };
   if (pickupAt(x, y)) return { kind: 'take', x, y };
-  const door = (cur.def.houses || []).find((h) => h.locked && h.door === x && h.y + h.h - 1 === y);
+  const door = P.dir === 'up' && (cur.def.houses || []).find((h) => h.locked && h.door === x && h.y + h.h - 1 === y);
   if (door) return { kind: 'locked', x, y, msg: door.locked };
     if (c === 'C') return { kind: 'open', x, y };
   if (c === 'J') return hasPower('pick') ? { kind: 'power', p: 'pick', x, y } : { kind: 'look', x, y };

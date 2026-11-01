@@ -410,13 +410,13 @@ function buildMap(m, st) {
       const inside = x >= hs.x && x < hs.x + hs.w && y >= hs.y && y < hs.y + hs.h, t = m.t[y][x];
       if (t === 'D' || (hs.door === x && y === hs.y + hs.h - 1)) continue;
       let hit = 0;
-      for (const [sx, sz] of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+      for (const sx of [0.2, 0.5, 0.8]) for (const sz of [0.2, 0.5, 0.8]) {
         org.set(x + sx, 12, y + sz); rc.set(org, down);
         const h = rc.intersectObject(o, true)[0];
-        if (h && h.point.y > 0.45) hit++;
+        if (h && h.point.y > 0.3) hit++;
       }
       if (inside && hit < 3) open.add(x + ',' + y); // mostly empty ground: walkable
-      if (!inside && hit >= 3) closed.add(x + ',' + y); // the model overhangs this tile: solid
+      if (!inside && hit >= 4) closed.add(x + ',' + y); // the model overhangs this tile: solid
     }
   }
   W3D.openTiles = open; W3D.closedTiles = closed;
