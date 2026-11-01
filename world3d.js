@@ -543,7 +543,10 @@ function syncMap(dt, S) {
     }
     a.obj.visible = true;
     a.obj.position.set(x, 0, z);
-    a.rotTarget = DIR_ROT[dir];
+    // face the actual direction of travel (diagonals included)
+    if (i === 0) a.rotTarget = P.rot != null ? P.rot : DIR_ROT[dir];
+    else if (moving) { const A3 = P.hist[i + 1] || P.hist[P.hist.length - 1], B3 = P.hist[i] || A3; a.rotTarget = Math.atan2(B3.x - A3.x, B3.y - A3.y); }
+    else a.rotTarget = DIR_ROT[dir];
     playAct(a, moving ? (S.running ? 'Running_A' : 'Walking_A') : 'Idle_A');
   });
   for (const n of cur.npcs) {

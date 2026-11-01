@@ -168,8 +168,8 @@ window.addEventListener('keyup', (e) => { const k = KEYMAP[e.key]; if (k) releas
 window.addEventListener('blur', () => { for (const k in held) release(k); });
 
 (function setupTouch() {
-  // virtual analog stick: the knob follows your thumb; direction snaps to the closest of 4 ways,
-  // and pushing it near the edge makes the party run
+  // virtual analog stick: the knob follows your thumb. Walking uses 8 directions (diagonals too);
+  // menus get the closest of 4. Pushing it near the edge makes the party run.
   const stick = document.getElementById('stick'), knob = stick.querySelector('.knob');
   let sDir = null, sId = null;
   const setDir = (d) => { if (d === sDir) return; if (sDir) release(sDir); sDir = d; if (d) press(d); };
@@ -181,12 +181,14 @@ window.addEventListener('blur', () => { for (const k in held) release(k); });
     knob.style.transform = `translate(${dx}px, ${dy}px)`;
     const mag = Math.min(1, dist / max);
     stickRun = mag > 0.92;
-    if (mag < 0.28) { setDir(null); return; }
+    if (mag < 0.28) { setDir(null); stickVec = null; return; }
     setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+    const oct = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); // 0 = right, 2 = down, 4/-4 = left, -2 = up
+    stickVec = { dx: [1, 1, 0, -1, -1, -1, 0, 1][(oct + 8) % 8], dy: [0, 1, 1, 1, 0, -1, -1, -1][(oct + 8) % 8], ax: dx, ay: dy };
   };
   stick.addEventListener('pointerdown', (e) => { e.preventDefault(); audioInit(); try { stick.setPointerCapture(e.pointerId); } catch (_) {} sId = e.pointerId; stick.classList.add('active'); upd(e); });
   stick.addEventListener('pointermove', (e) => { if (e.pointerId === sId) upd(e); });
-  const end = (e) => { if (e.pointerId !== sId) return; sId = null; stickRun = false; stick.classList.remove('active'); knob.style.transform = ''; setDir(null); };
+  const end = (e) => { if (e.pointerId !== sId) return; sId = null; stickRun = false; stickVec = null; stick.classList.remove('active'); knob.style.transform = ''; setDir(null); };
   stick.addEventListener('pointerup', end); stick.addEventListener('pointercancel', end); stick.addEventListener('lostpointercapture', end);
   document.querySelectorAll('.btn').forEach((b) => {
     const k = b.dataset.k;
@@ -313,7 +315,7 @@ function handleInput(k) {
     doMapAction(k);
   }
 }
-let pendingAction = null, stickRun = false;
+let pendingAction = null, stickRun = false, stickVec = null;
 function doMapAction(k) {
   if (k === 'a') interact();
   else if (k === 'p') usePowerKey();
@@ -533,8 +535,8 @@ function blocked(x, y, self) {
   return false;
 }
 function placePlayer(x, y, dir) {
-  P.x = P.fx = x; P.y = P.fy = y; P.t = 1; P.moving = false; P.dir = dir || P.dir; P.path = []; P.after = null; P.marker = null;
-  P.hist = [{ x, y }, { x, y }, { x, y }, { x, y }];
+  P.x = P.fx = x; P.y = P.fy = y; P.t = 1; P.moving = false; P.dir = dir || P.dir; P.path = []; P.after = null; P.marker = null; P.rot = null; P.diag = false;
+  P.hist = [{ x, y }, { x, y }, { x, y }, { x, y }, { x, y }, { x, y }];
 }
 async function runScript(fn) {
   if (busy) return;
@@ -563,7 +565,7 @@ function updateMap(dt) {
     n.fx = n.x; n.fy = n.y; n.x = nx; n.y = ny; n.t = 0; n.moving = true;
   }
   if (P.moving) {
-    P.t += dt / (held.b || stickRun ? 110 : 190); P.anim += dt;
+    P.t += dt / ((held.b || stickRun ? 110 : 190) * (P.diag ? 1.41 : 1)); P.anim += dt;
     if (P.t < 1) return;
     P.t = 1; P.moving = false;
     onStep();
@@ -572,6 +574,23 @@ function updateMap(dt) {
   }
   if (busy || UI.dialog || UI.menus.length || UI.panel || game.scene !== 'map') return;
   let d = heldDir();
+  // diagonal walking: analog stick, or two arrow keys held together
+  const v = stickVec || (d ? { dx: held.right - held.left, dy: held.down - held.up, ax: held.right - held.left, ay: held.down - held.up } : null);
+  if (v && v.dx && v.dy) {
+    const mx = P.x + v.dx, my = P.y + v.dy;
+    const sideX = !blocked(P.x + v.dx, P.y), sideY = !blocked(P.x, P.y + v.dy);
+    if (sideX && sideY && !blocked(mx, my)) {
+      P.dir = Math.abs(v.ax) >= Math.abs(v.ay) ? (v.dx > 0 ? 'right' : 'left') : (v.dy > 0 ? 'down' : 'up');
+      P.rot = Math.atan2(v.dx, v.dy);
+      P.fx = P.x; P.fy = P.y; P.x = mx; P.y = my; P.t = 0; P.moving = true; P.diag = true;
+      P.hist.unshift({ x: mx, y: my }); if (P.hist.length > 6) P.hist.pop();
+      return;
+    }
+    // can't cut the corner: slide along whichever side is open (the stronger push first)
+    const xFirst = Math.abs(v.ax) >= Math.abs(v.ay);
+    const order = xFirst ? [[sideX, v.dx > 0 ? 'right' : 'left'], [sideY, v.dy > 0 ? 'down' : 'up']] : [[sideY, v.dy > 0 ? 'down' : 'up'], [sideX, v.dx > 0 ? 'right' : 'left']];
+    d = (order.find((o) => o[0]) || [null, order[0][1]])[1];
+  } else if (stickVec) d = stickVec.dx > 0 ? 'right' : stickVec.dx < 0 ? 'left' : stickVec.dy > 0 ? 'down' : 'up';
   if (!d && P.path.length) {
     d = P.path[0];
     if (blocked(P.x + DIRS[d][0], P.y + DIRS[d][1])) { P.path = []; P.after = null; P.marker = null; d = null; }
@@ -583,10 +602,10 @@ function updateMap(dt) {
     return;
   }
   if (!d) { P.anim = 0; return; }
-  P.dir = d;
+  P.dir = d; P.rot = null;
   const nx = P.x + DIRS[d][0], ny = P.y + DIRS[d][1];
   if (!blocked(nx, ny)) {
-    P.fx = P.x; P.fy = P.y; P.x = nx; P.y = ny; P.t = 0; P.moving = true;
+    P.fx = P.x; P.fy = P.y; P.x = nx; P.y = ny; P.t = 0; P.moving = true; P.diag = false;
     P.hist.unshift({ x: nx, y: ny }); if (P.hist.length > 6) P.hist.pop();
   }
 }
