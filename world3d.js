@@ -35,7 +35,7 @@ async function load(onProgress) {
   const jobs = []; let done = 0, total = 0;
   for (const [dir, names] of Object.entries(FILES)) for (const n of names) {
     total++;
-    jobs.push(loader.loadAsync(`${A}${dir}/${n}.glb`).then((g) => { G[dir + '/' + n] = g; onProgress && onProgress(++done / total); }));
+    jobs.push(loader.loadAsync(`${A}${dir}/${n}.glb`).then((g) => { G[dir + '/' + n] = g; onProgress && onProgress(++done / total); }, (e) => { throw new Error(`${dir}/${n}: ${(e && (e.message || e.type)) || e}`); }));
   }
   await Promise.all(jobs);
   for (const k of ['chars/Rig_Medium_General', 'chars/Rig_Medium_MovementBasic']) for (const c of G[k].animations) CLIPS[c.name] = c;
@@ -133,7 +133,8 @@ let water = null, falls = [];
 
 function init(canvas) {
   glCanvas = canvas;
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' }); }
+  catch (e) { throw new Error('3D graphics (WebGL) are not available in this browser.'); }
   renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;

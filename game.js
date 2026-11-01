@@ -1546,7 +1546,9 @@ function render(dt) {
   if (game.scene === 'map' && cur) drawMapHUD();
   if (game.scene === 'battle' && B) drawBattleUI();
   if (game.scene === 'ending') renderEnding();
-  if (game.scene === 'loading') { font(10); text(loadErr ? 'Could not load the game art. Check your connection and reload.' : 'Loading...', W / 2, H / 2 - 8, COL.light, 'center'); if (!loadErr) { ctx.fillStyle = '#46402e'; ctx.fillRect(W / 2 - 50, H / 2, 100, 5); ctx.fillStyle = '#ffad55'; ctx.fillRect(W / 2 - 50, H / 2, 100 * loadP, 5); } }
+  if (game.scene === 'loading') { font(10);
+    if (loadErr) { const lines = ['Could not start the game.', 'Try reloading, or open the link in Safari or Chrome.', '', ...wrap(String(loadErr), W - 20).slice(0, 6)]; lines.forEach((l, i) => text(l, W / 2, H / 2 - 30 + i * 13, i < 2 ? COL.light : '#ffad55', 'center')); }
+    else text('Loading...', W / 2, H / 2 - 8, COL.light, 'center'); if (!loadErr) { ctx.fillStyle = '#46402e'; ctx.fillRect(W / 2 - 50, H / 2, 100, 5); ctx.fillStyle = '#ffad55'; ctx.fillRect(W / 2 - 50, H / 2, 100 * loadP, 5); } }
   drawUI();
   if (UI.flash > 0) { ctx.globalAlpha = UI.flash; rc(0, 0, W, H, UI.flashCol); ctx.globalAlpha = 1; }
   if (UI.fade > 0) { ctx.globalAlpha = UI.fade; rc(0, 0, W, H, '#07040e'); ctx.globalAlpha = 1; }
@@ -1566,7 +1568,7 @@ let loadP = 0, loadErr = null;
     await Promise.all([ART.load((p) => (p2 = p, loadP = p2 * 0.15 + p3 * 0.85)), W3D.load((p) => (p3 = p, loadP = p2 * 0.15 + p3 * 0.85)), Promise.race([document.fonts.load('10px Pixelify'), sleep(1500)])]);
     W3D.ready = true;
   }
-  catch (e) { loadErr = e.message; return; }
+  catch (e) { loadErr = (e && (e.message || e.type || e.toString())) || 'unknown error'; console.error(e); return; }
   resize();
   runScript(titleScreen);
 })();
