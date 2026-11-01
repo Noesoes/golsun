@@ -229,7 +229,10 @@ function wrap(text, maxW) {
   return out;
 }
 // who: key in PEOPLE (shows a portrait), or omitted for narration.
+// story text names the hero "Wren" and uses {her}; swap in the player's chosen name and pronouns
+function heroText(t) { return String(t).replace(/\bWren\b/g, () => HERO.name).replace(/\{her\}/g, () => PRONOUNS[HERO.pro].her); }
 function say(text, who, nameOverride, hold) {
+  text = heroText(text);
   return new Promise((res) => {
     const p = who && PEOPLE[who];
     font(10);
@@ -431,8 +434,10 @@ const fx = [];
 function newState() {
   state = { map: 'village', x: 14, y: 7, dir: 'down', party: [], gold: 30, items: { herb: 2 }, flags: {}, mods: {}, trinkets: {}, known: {}, harmony: 0, steps: 0, time: 0 };
 }
-function startParty(cls) {
-  state.classes = assignClasses(cls); applyClasses(state.classes);
+function startParty(hero) {
+  if (typeof hero === 'string') hero = { name: 'Wren', pro: 'she', outfit: 0, cls: hero };
+  state.hero = { name: hero.name, pro: hero.pro, outfit: hero.outfit };
+  state.classes = assignClasses(hero.cls); applyClasses(state.classes, state.hero);
   state.party = [makeMember('wren', 1)];
 }
 function makeMember(id, lv) { const m = { id, lv, xp: 0, hp: 1, fp: 1, weapon: null, armor: null }; const s = stats(m); m.hp = s.hp; m.fp = s.fp; return m; }
@@ -464,7 +469,7 @@ function loadGame() {
       // saves from before classes existed: give everyone the class closest to their old role
       if (!state.classes) state.classes = { wren: 'ranger', bram: 'warden', corin: 'rogue', tamsin: 'druid' };
       for (const m of state.party) state.flags[m.id + 'Joined'] = true;
-      applyClasses(state.classes);
+      applyClasses(state.classes, state.hero || { name: 'Wren', pro: 'she', outfit: 0 });
       for (const m of state.party) clampHero(m);
       return true;
     }
@@ -1352,7 +1357,7 @@ async function statusPage() {
       font(8, true); text(`Passive · ${hd.passive.name}`, 16, py, '#8a4ab0'); font(8); wrap(hd.passive.desc, W - 32).forEach((l, r) => text(l, 16, py + 11 + r * 10, COL.text));
       font(8, true); text('Skills', 16, py + 36, COL.gold);
       font(8); hd.skills.forEach(([id, lv], r) => { const got = m.lv >= lv; text(SKILLS[id].name, 16 + (r % 2) * 130, py + 47 + Math.floor(r / 2) * 11, got ? COL.text : COL.dim); if (!got) text('Lv ' + lv, 16 + (r % 2) * 130 + 120, py + 47 + Math.floor(r / 2) * 11, COL.dim, 'right'); });
-      font(8); wrap(hd.bio, W - 32).forEach((l, r) => text(l, 16, py + 86 + r * 10, COL.dim));
+      font(8); wrap(heroText(hd.bio), W - 32).forEach((l, r) => text(l, 16, py + 86 + r * 10, COL.dim));
       font(8); text(state.party.length > 1 ? 'Tap a side or press ◀ ▶ to switch hero · B to close' : 'B to close', W / 2, H - 12, COL.dim, 'center');
       hits.push({ x: 0, y: 0, w: W / 2, h: H - 24, fn: () => inputQ.push('left') });
       hits.push({ x: W / 2, y: 0, w: W / 2, h: H - 24, fn: () => inputQ.push('right') });
@@ -1561,16 +1566,16 @@ function renderEnding() {
   ctx.globalAlpha = 1;
 }
 // ---------- class selection ----------
-async function chooseClass() {
-  let hover = 0;
+async function chooseClass(hero) {
+  let hover = Math.max(0, CLASS_ORDER.indexOf(hero.cls));
   const prev = UI.panel;
   const MAX = { hp: 44, fp: 22, atk: 13, def: 11, agi: 14 };
   UI.panel = () => {
     rc(0, 0, W, H, 'rgba(8,4,18,0.82)');
     const k = CLASS_ORDER[hover], c = CLASSES[k], ph = H - 84;
     box(4, 4, W - 8, ph);
-    font(11, true); text("Choose Wren's class", W / 2, 20, COL.gold, 'center');
-    const pt = W3D.portrait(k + ':wren'); ctx.drawImage(pt.big || pt, 10, 26, 76, 76);
+    font(11, true); text(`Choose ${hero.name}'s class`, W / 2, 20, COL.gold, 'center');
+    const pt = W3D.portrait(k + ':wren:' + hero.outfit); ctx.drawImage(pt.big || pt, 10, 26, 76, 76);
     font(14, true); text(c.name, 94, 42, COL.text);
     font(8); text(`${ELEM_NAME[c.elem]} element`, 94, 54, ELEM_TEXT[c.elem]);
     font(8); wrap(c.blurb, W - 106).forEach((l, i) => text(l, 94, 68 + i * 10, COL.text));
@@ -1585,13 +1590,73 @@ async function chooseClass() {
   };
   let picked = null;
   while (!picked) {
-    const j = await choose(CLASS_ORDER.map((k) => ({ label: CLASSES[k].name, color: ELEM_TEXT[CLASSES[k].elem] })), { x: 6, bottom: H - 6, w: W - 12, cols: 3, max: 2, cursor: hover, cancel: false, onHover: (i) => (hover = i) });
-    hover = j;
-    const ok = await choose([`Begin as a ${CLASSES[CLASS_ORDER[j]].name}`, 'Look again'], { x: W / 2 - 70, bottom: H - 6, w: 140 });
-    if (ok === 0) picked = CLASS_ORDER[j];
+    const j = await choose(CLASS_ORDER.map((k) => ({ label: CLASSES[k].name, color: ELEM_TEXT[CLASSES[k].elem] })), { x: 6, bottom: H - 6, w: W - 12, cols: 3, max: 2, cursor: hover, onHover: (i) => (hover = i) });
+    if (j < 0) { picked = hero.cls; break; }
+    picked = CLASS_ORDER[j];
   }
   UI.panel = prev;
   return picked;
+}
+function askName(current) {
+  return new Promise((res) => {
+    const stage = document.getElementById('stage') || document.body, r = stage.getBoundingClientRect();
+    const wrapEl = document.createElement('div');
+    wrapEl.style.cssText = `position:fixed;left:${r.left}px;top:${r.top + r.height * 0.3}px;width:${r.width}px;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:50`;
+    const inp = document.createElement('input');
+    inp.value = current; inp.maxLength = 12; inp.autocomplete = 'off'; inp.spellcheck = false; inp.setAttribute('autocapitalize', 'words');
+    inp.style.cssText = 'font:22px Pixelify, sans-serif;padding:10px 14px;width:70%;border-radius:10px;border:3px solid #f06733;background:#fff8e8;color:#3a2a4a;text-align:center;outline:none';
+    const btn = document.createElement('button'); btn.textContent = 'Done';
+    btn.style.cssText = 'font:18px Pixelify, sans-serif;padding:8px 28px;border-radius:10px;border:0;background:#f06733;color:#fff8e8';
+    wrapEl.append(inp, btn); document.body.appendChild(wrapEl);
+    const finish = () => {
+      if (!wrapEl.parentNode) return;
+      const v = inp.value.replace(/[^\p{L}\p{N} '\-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+      wrapEl.remove(); res(v || current);
+    };
+    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') finish(); });
+    inp.addEventListener('keyup', (e) => e.stopPropagation());
+    btn.addEventListener('click', finish);
+    setTimeout(() => { inp.focus(); inp.select(); }, 50);
+  });
+}
+async function createCharacter() {
+  const hero = { name: 'Wren', pro: 'she', outfit: 0, cls: 'warden' };
+  const prev = UI.panel;
+  UI.panel = () => {
+    rc(0, 0, W, H, 'rgba(8,4,18,0.78)');
+    const c = CLASSES[hero.cls], ph = H - 104;
+    box(4, 4, W - 8, ph);
+    font(11, true); text('Create your hero', W / 2, 20, COL.gold, 'center');
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(W3D.figure(hero.cls + ':wren:' + hero.outfit), 14, 24, 84, 120); ctx.imageSmoothingEnabled = false;
+    font(15, true); text(hero.name, 114, 46, COL.text);
+    font(8); text(PRONOUNS[hero.pro].label, 114, 58, COL.dim);
+    font(10, true); text(c.name, 114, 76, ELEM_TEXT[c.elem]); font(8); text(`${ELEM_NAME[c.elem]} element · ${OUTFITS[hero.outfit].name} outfit`, 114, 88, COL.dim);
+    font(8); wrap(c.blurb, W - 128).forEach((l, i) => text(l, 114, 102 + i * 10, COL.text));
+    font(8, true); text(`Passive: ${c.passive.name}`, 12, 156, '#8a4ab0'); font(8); wrap(c.passive.desc, W - 28).forEach((l, i) => text(l, 12, 167 + i * 10, COL.text));
+    font(8, true); text('Starting skills', 12, 190, COL.gold);
+    font(8); c.skills.filter((a) => a[1] === 1).forEach(([id], i) => wrap(`${SKILLS[id].name}: ${SKILLS[id].desc}`, W - 28).slice(0, 2).forEach((l, j) => text(l, 12, 201 + i * 22 + j * 10, COL.text)));
+    if (ph > 274) { font(8); wrap('Three companions will join along the way, each with a different class.', W - 28).forEach((l, i) => text(l, 12, 252 + i * 10, COL.dim)); }
+  };
+  let c = 0;
+  while (true) {
+    c = await choose([
+      { label: 'Name', right: hero.name },
+      { label: 'Pronouns', right: PRONOUNS[hero.pro].label },
+      { label: 'Class', right: CLASSES[hero.cls].name, color: ELEM_TEXT[CLASSES[hero.cls].elem] },
+      { label: 'Outfit colors', right: OUTFITS[hero.outfit].name },
+      { label: 'Begin the adventure', color: COL.gold },
+    ], { x: 8, bottom: H - 6, w: W - 16, cursor: c, cancel: false });
+    if (c === 0) { sfx('confirm'); hero.name = await askName(hero.name); }
+    else if (c === 1) { const ks = Object.keys(PRONOUNS); hero.pro = ks[(ks.indexOf(hero.pro) + 1) % ks.length]; }
+    else if (c === 2) { const keep = UI.panel; UI.panel = null; hero.cls = await chooseClass(hero); UI.panel = keep; }
+    else if (c === 3) hero.outfit = (hero.outfit + 1) % OUTFITS.length;
+    else if (c === 4) {
+      const ok = await choose([`Yes, I'm ${hero.name} the ${CLASSES[hero.cls].name}`, 'Not yet'], { x: W / 2 - 90, bottom: H - 6, w: 180 });
+      if (ok === 0) break;
+    }
+  }
+  UI.panel = prev;
+  return hero;
 }
 async function titleScreen() {
   game.scene = 'title'; music('title');
@@ -1616,11 +1681,10 @@ async function titleScreen() {
     newState();
     game.scene = 'intro';
     await fade(0);
+    startParty(await createCharacter());
     await say('Mossbell Vale has always bloomed. Beneath the old hill, the Rootwell spring hums a quiet song, and wherever its water flows, flowers follow.');
     await say('But three days ago, the humming stopped. And the petals began to turn gray...');
-    await say('In the village of Mossbell, a young cartographer named Wren is about to set out to find out why.');
-    startParty(await chooseClass());
-    await say(`Wren is a ${HEROES.wren.role}! Companions will join along the way, each with a different class.`);
+    await say(`In the village of Mossbell, a young ${HEROES.wren.role.toLowerCase()} named Wren is about to set out to find out why.`);
     await fade(1);
     titleBuilt = false; loadMap('village'); placePlayer(12, 13, 'down');
     game.scene = 'map';
@@ -1678,7 +1742,7 @@ function render(dt) {
   if (game.scene === 'battle' && B) drawBattleUI();
   if (game.scene === 'ending') renderEnding();
   if (game.scene === 'loading') { font(10);
-    if (loadErr) { const lines = ['Could not start the game.', 'Try reloading, or open the link in Safari or Chrome.', '', ...wrap(String(loadErr), W - 20).slice(0, 6)]; lines.forEach((l, i) => text(l, W / 2, H / 2 - 30 + i * 13, i < 2 ? COL.light : '#ffad55', 'center')); }
+    if (loadErr) { hits.push({ x: 0, y: 0, w: W, h: H, fn: () => location.reload() }); const lines = ['Could not start the game.', 'Tap here to try again, or open the link in Safari.', '', ...wrap(String(loadErr), W - 20).slice(0, 6)]; lines.forEach((l, i) => text(l, W / 2, H / 2 - 30 + i * 13, i < 2 ? COL.light : '#ffad55', 'center')); }
     else text('Loading...', W / 2, H / 2 - 8, COL.light, 'center'); if (!loadErr) { ctx.fillStyle = '#46402e'; ctx.fillRect(W / 2 - 50, H / 2, 100, 5); ctx.fillStyle = '#ffad55'; ctx.fillRect(W / 2 - 50, H / 2, 100 * loadP, 5); } }
   drawUI();
   if (UI.flash > 0) { ctx.globalAlpha = UI.flash; rc(0, 0, W, H, UI.flashCol); ctx.globalAlpha = 1; }

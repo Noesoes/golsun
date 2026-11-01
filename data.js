@@ -8,7 +8,7 @@ const ELEM_NAME = { gale: 'Gale', ember: 'Ember', bloom: 'Bloom', hush: 'Hush' }
 // ---------- characters & classes ----------
 // The four heroes keep their personality and field tool; their class decides stats, skills, Burst, passive and look.
 const CHARS = {
-  wren: { name: 'Wren', field: 'gust', bio: 'A young cartographer from Mossbell, carrying her mother\'s gale gauntlet.', tint: 0xfff6ee },
+  wren: { name: 'Wren', field: 'gust', bio: 'A young cartographer from Mossbell, carrying {her} mother\'s gale gauntlet.', tint: 0xfff6ee },
   bram: { name: 'Bram', field: 'kindle', bio: 'The village blacksmith\'s apprentice, never without his forge lantern.', tint: 0xffe4cc },
   corin: { name: 'Corin', field: 'pick', bio: 'A courier for the Larkspur post, with a ring of skeleton keys.', tint: 0xe4ecff },
   tamsin: { name: 'Tamsin', field: 'bloom', bio: 'A botanist from Larkspur College who studies the Rootwell.', tint: 0xeaffea },
@@ -62,11 +62,16 @@ function assignClasses(playerCls) {
   }
   return { wren: playerCls, bram: best[0], corin: best[1], tamsin: best[2] };
 }
+// character creation: the hero's name, pronouns and outfit colours
+const PRONOUNS = { she: { label: 'She / her', her: 'her' }, he: { label: 'He / him', her: 'his' }, they: { label: 'They / them', her: 'their' } };
+const OUTFITS = [{ name: 'Classic', tint: null }, { name: 'Ember', tint: 0xff8070 }, { name: 'Moss', tint: 0x90e070 }, { name: 'Tide', tint: 0x80a8ff }, { name: 'Dusk', tint: 0xc090ff }, { name: 'Honey', tint: 0xffd060 }];
+let HERO = { name: 'Wren', pro: 'she', outfit: 0 };
 const HEROES = {};
-function applyClasses(classes) {
+function applyClasses(classes, hero) {
+  if (hero) HERO = hero;
   for (const id in CHARS) {
-    const k = classes[id], c = CLASSES[k], ch = CHARS[id];
-    HEROES[id] = { ...c, name: ch.name, field: ch.field, bio: ch.bio, cls: k, role: c.name, look: { sheet: k + ':' + id } };
+    const k = classes[id], c = CLASSES[k], ch = CHARS[id], me = id === 'wren';
+    HEROES[id] = { ...c, name: me ? HERO.name : ch.name, field: ch.field, bio: ch.bio, cls: k, role: c.name, look: { sheet: k + ':' + id + (me ? ':' + (HERO.outfit || 0) : '') } };
   }
 }
 applyClasses({ wren: 'ranger', bram: 'warden', corin: 'rogue', tamsin: 'druid' });
@@ -165,7 +170,7 @@ const ENCOUNTERS = {
 
 // ---------- people (dialog speakers & NPC looks) ----------
 const PEOPLE = {
-  wren: { name: 'Wren', get look() { return HEROES.wren.look; } },
+  wren: { get name() { return HEROES.wren.name; }, get look() { return HEROES.wren.look; } },
   bram: { name: 'Bram', get look() { return HEROES.bram.look; } },
   corin: { name: 'Corin', get look() { return HEROES.corin.look; } },
   tamsin: { name: 'Tamsin', get look() { return HEROES.tamsin.look; } },
@@ -389,7 +394,7 @@ const MAPS = {
       if (!state.flags.bossDead) { await say('The spring is still and gray. Not a ripple.'); return; }
       if (state.flags.springSings) { await say('The Rootwell bubbles and hums, bright as morning.'); return; }
       await say('Rootwell... please wake up.', 'wren');
-      await say('Wren cups her hands into the water. A single clear note rises, then another, and another...');
+      await say('Wren cups {her} hands into the water. A single clear note rises, then another, and another...');
       sfx('heal'); state.flags.springSings = true;
       UI.flash = 1; UI.flashCol = '#c8fff0'; await sleep(900); sfx('level');
       await endingScene();

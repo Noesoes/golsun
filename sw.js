@@ -1,5 +1,5 @@
 // Offline support: network-first, falling back to the cache when offline.
-const CACHE = 'rootwell-v11';
+const CACHE = 'rootwell-v12';
 const FILES = ['./', './index.html', './art.js', './data.js', './game.js', './world3d.js', './lib/three.module.min.js', './lib/GLTFLoader.js', './lib/SkeletonUtils.js', './lib/BufferGeometryUtils.js', './lib/meshopt_decoder.module.js', './fonts/pixelify.woff2', './assets/meta.json', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
@@ -11,6 +11,6 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(e.request)
       .then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return r; })
-      .catch(() => caches.match(e.request, { ignoreSearch: true }))
+      .catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || Response.error()))
   );
 });

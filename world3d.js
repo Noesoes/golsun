@@ -32,12 +32,20 @@ const tmpV = new THREE.Vector3();
 // ------------------------------------------------------------------ loading
 async function load(onProgress) {
   const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
-  const jobs = []; let done = 0, total = 0;
-  for (const [dir, names] of Object.entries(FILES)) for (const n of names) {
-    total++;
-    jobs.push(loader.loadAsync(`${A}${dir}/${n}.glb`).then((g) => { G[dir + '/' + n] = g; onProgress && onProgress(++done / total); }, (e) => { throw new Error(`${dir}/${n}: ${(e && (e.message || e.type)) || e}`); }));
+  // phones on a patchy connection: a few files at a time, and retry each one before giving up
+  const queue = []; let done = 0;
+  for (const [dir, names] of Object.entries(FILES)) for (const n of names) queue.push(dir + '/' + n);
+  const total = queue.length;
+  async function fetchOne(key) {
+    let err;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try { G[key] = await loader.loadAsync(`${A}${key}.glb${attempt ? '?r=' + attempt : ''}`); onProgress && onProgress(++done / total); return; }
+      catch (e) { err = e; await new Promise((r) => setTimeout(r, 600 * (attempt + 1))); }
+    }
+    throw new Error(`${key}: ${(err && (err.message || err.type)) || err}`);
   }
-  await Promise.all(jobs);
+  async function worker() { while (queue.length) await fetchOne(queue.shift()); }
+  await Promise.all([0, 1, 2, 3, 4, 5].map(worker));
   for (const k of ['chars/Rig_Medium_General', 'chars/Rig_Medium_MovementBasic']) for (const c of G[k].animations) CLIPS[c.name] = c;
   for (const g of Object.values(G)) g.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material && o.material.map) o.material.map.anisotropy = 4; } });
   setupWind();
@@ -455,15 +463,24 @@ const CAST = {
 // heroes look like their class (Warden = Knight, Druid = hooded...), tinted per character
 function castOf(who) {
   if (typeof HEROES !== 'undefined' && HEROES[who]) who = HEROES[who].look.sheet;
-  if (who.includes(':')) { const [cls, id] = who.split(':'); return [CLASSES[cls].model, CHARS[id] && CHARS[id].tint, 1]; }
+  if (who.includes(':')) {
+    const [cls, id, outfit] = who.split(':'), o = outfit != null && OUTFITS[+outfit];
+    return [CLASSES[cls].model, CHARS[id] && CHARS[id].tint, 1, o && o.tint];
+  }
   return CAST[who] || ['Rogue'];
 }
 const sheetOf = (who) => (typeof HEROES !== 'undefined' && HEROES[who] ? HEROES[who].look.sheet : who);
-function makeActor(model, tint, scale = 1) {
+const CLOTHES = /Body|Cape|Leg|Hat|Helmet|Mask|Quiver/;
+function makeActor(model, tint, scale = 1, outfit = null) {
   const src = G['chars/' + model].scene, obj = skClone(src);
   const wrap = new THREE.Group(); wrap.add(obj);
   obj.scale.setScalar(0.6 * scale);
-  if (tint) obj.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.multiply(new THREE.Color(tint)); } });
+  if (tint || outfit) obj.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material = o.material.clone();
+    if (tint) o.material.color.multiply(new THREE.Color(tint));
+    if (outfit && CLOTHES.test(o.name)) o.material.color.multiply(new THREE.Color(outfit)); // outfit colours: clothes only, never skin
+  });
   obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
   const mixer = new THREE.AnimationMixer(obj), actions = {};
   for (const n of ['Idle_A', 'Walking_A', 'Running_A', 'Hit_A', 'Death_A', 'Throw', 'Use_Item', 'Interact', 'Spawn_Ground']) if (CLIPS[n]) actions[n] = mixer.clipAction(CLIPS[n]);
@@ -482,7 +499,7 @@ function actor(id, who) {
   let a = actors.get(id);
   if (!a) {
     const c = castOf(who);
-    a = makeActor(c[0], c[1], c[2]); actors.set(id, a); scene.add(a.obj);
+    a = makeActor(c[0], c[1], c[2], c[3]); actors.set(id, a); scene.add(a.obj);
   }
   return a;
 }
@@ -655,7 +672,7 @@ function battleStart(B, party, heroPos) {
     e.sz = { w: hpx * 0.9, h: hpx };
   }
   party.forEach((m, i) => {
-    const c = castOf(m.id); const a = makeActor(c[0], c[1], c[2]);
+    const c = castOf(m.id); const a = makeActor(c[0], c[1], c[2], c[3]);
     const hp = heroPos(i), p = screenToGround(battleCam, hp.x, hp.y);
     a.obj.position.copy(p); a.home = p.clone(); a.obj.rotation.y = -Math.PI / 2 + 0.35; a.obj.scale.setScalar(1.05);
     battleScene.add(a.obj); b3.set(m, a); bModels.push(a);
@@ -714,7 +731,7 @@ function portrait(who) {
   if (portraitCache.has(who)) return portraitCache.get(who);
   if (!pRenderer) { const c = document.createElement('canvas'); pRenderer = new THREE.WebGLRenderer({ canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: true }); pRenderer.setSize(76, 76, false); pRenderer.outputColorSpace = THREE.SRGBColorSpace; }
   const s = new THREE.Scene(); s.add(new THREE.HemisphereLight(0xffffff, 0x8a7a6a, 1.6)); const d = new THREE.DirectionalLight(0xffffff, 1.8); d.position.set(1, 2, 3); s.add(d);
-  const c = castOf(who); const a = makeActor(c[0], c[1], 1); a.mixer.update(0.4); s.add(a.obj); a.obj.updateMatrixWorld(true);
+  const c = castOf(who); const a = makeActor(c[0], c[1], 1, c[3]); a.mixer.update(0.4); s.add(a.obj); a.obj.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(a.obj), top = box.max.y;
   const cam = new THREE.PerspectiveCamera(28, 1, 0.01, 20); cam.position.set(0.25, top - 0.22, 1.35); cam.lookAt(0, top - 0.3, 0);
   pRenderer.render(s, cam);
@@ -723,6 +740,21 @@ function portrait(who) {
   small.big = out;
   portraitCache.set(who, small);
   return small;
+}
+// full-length picture for character creation (shows the outfit colours)
+function figure(who) {
+  const key = who + '|full'; if (portraitCache.has(key)) return portraitCache.get(key);
+  if (!portraitCache.size) portrait(who);
+  pRenderer.setSize(84, 120, false);
+  const s = new THREE.Scene(); s.add(new THREE.HemisphereLight(0xffffff, 0x8a7a6a, 1.6)); const d = new THREE.DirectionalLight(0xffffff, 1.8); d.position.set(1, 2, 3); s.add(d);
+  const c = castOf(who); const a = makeActor(c[0], c[1], 1, c[3]); a.mixer.update(0.4); a.obj.rotation.y = 0.45; s.add(a.obj); a.obj.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(a.obj), hgt = box.max.y, mid = hgt / 2;
+  const cam = new THREE.PerspectiveCamera(30, 84 / 120, 0.01, 20); cam.position.set(0.15, mid + 0.1, hgt * 2.05); cam.lookAt(0, mid, 0);
+  pRenderer.render(s, cam);
+  const out = document.createElement('canvas'); out.width = 84; out.height = 120; out.getContext('2d').drawImage(pRenderer.domElement, 0, 0);
+  pRenderer.setSize(76, 76, false);
+  portraitCache.set(key, out);
+  return out;
 }
 
 
@@ -885,5 +917,5 @@ function toScreen(wx, wy, wz) { return project(camera, wx, wy, wz); }
 function tileChanged(m, st) { if (mapInfo && m.id === mapInfo.id) { rebuildDynamic(m, st); setCaveLight(st); } }
 function hideActors() { for (const a of actors.values()) a.obj.visible = false; }
 
-window.W3D = { setQuality, init, load, resize, buildMap, syncMap, render, pickTile, toScreen, tileChanged, resetCamera, battleStart, battleSync, battleEnd, enemyScreen, titleSync, portrait, hideActors, setCaveLight, ENEMY_MODEL };
+window.W3D = { figure, setQuality, init, load, resize, buildMap, syncMap, render, pickTile, toScreen, tileChanged, resetCamera, battleStart, battleSync, battleEnd, enemyScreen, titleSync, portrait, hideActors, setCaveLight, ENEMY_MODEL };
 window.__w3dReady && window.__w3dReady();
