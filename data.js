@@ -303,7 +303,7 @@ const MAPS = {
         state.flags.intro = true;
         await say("Wren! There you are. Your gran's been looking for you all morning.", 'bram');
         await say("Something's wrong with the flowers. Even the bees won't leave their hives. Come on, her cottage is just up the path to the northwest!", 'bram');
-        await say("(Move with the analog stick, or tap where you want to go. Press A, or tap people and things, to interact.)");
+        await say("(Use the arrow pad to walk, and swipe across the screen to look around. You can also tap a spot to walk there. Press A, or tap people and things, to interact.)");
       }
     },
   },

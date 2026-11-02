@@ -175,12 +175,13 @@ window.addEventListener('blur', () => { for (const k in held) release(k); });
   const upd = (e) => {
     const r = dpad.getBoundingClientRect();
     const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-    if (Math.hypot(dx, dy) < r.width * 0.1) { setDir(null); return; }
+    if (Math.hypot(dx, dy) < r.width * 0.1) { setDir(null); padVec = null; return; }
     setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+    const l = Math.hypot(dx, dy); padVec = { x: dx / l, y: dy / l }; // walking follows your thumb smoothly
   };
   dpad.addEventListener('pointerdown', (e) => { e.preventDefault(); audioInit(); try { dpad.setPointerCapture(e.pointerId); } catch (_) {} dId = e.pointerId; upd(e); });
   dpad.addEventListener('pointermove', (e) => { if (e.pointerId === dId) upd(e); });
-  const end = (e) => { if (e.pointerId !== dId) return; dId = null; setDir(null); };
+  const end = (e) => { if (e.pointerId !== dId) return; dId = null; setDir(null); padVec = null; };
   dpad.addEventListener('pointerup', end); dpad.addEventListener('pointercancel', end); dpad.addEventListener('lostpointercapture', end);
   document.querySelectorAll('.btn').forEach((b) => {
     const k = b.dataset.k;
@@ -188,11 +189,22 @@ window.addEventListener('blur', () => { for (const k in held) release(k); });
     const up = () => { b.classList.remove('on'); release(k); };
     b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
   });
+  // on the map, drag across the screen to turn the camera; a quick tap still walks or interacts
+  let drag = null;
+  const toLogical = (e) => { const r = cvs.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H]; };
   cvs.addEventListener('pointerdown', (e) => {
     e.preventDefault(); audioInit();
-    const r = cvs.getBoundingClientRect();
-    tap(((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H);
+    if (game.scene === 'map' && !UI.menus.length && !UI.dialog && !UI.waiter && !UI.panel) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, moved: false }; try { cvs.setPointerCapture(e.pointerId); } catch (_) {} return; }
+    tap(...toLogical(e));
   });
+  cvs.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x; drag.x = e.clientX;
+    if (Math.abs(e.clientX - drag.x0) > 8) drag.moved = true;
+    if (drag.moved) W3D.setCamYaw(W3D.getCamYaw() - dx * 0.011);
+  });
+  const dragEnd = (e) => { if (!drag || e.pointerId !== drag.id) return; const d = drag; drag = null; if (!d.moved && e.type === 'pointerup') tap(...toLogical(e)); };
+  cvs.addEventListener('pointerup', dragEnd); cvs.addEventListener('pointercancel', dragEnd);
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());
@@ -303,11 +315,10 @@ function handleInput(k) {
   if (UI.dialog) { if (k === 'a' || k === 'b') advanceDialog(); return; }
   if (UI.waiter) { if (k === 'a' || k === 'b') { const w = UI.waiter; UI.waiter = null; w(); } return; }
   if (game.scene === 'map' && !busy) {
-    if (P.moving) { if (k === 'a' || k === 'p' || k === 'm') pendingAction = k; return; }
     doMapAction(k);
   }
 }
-let pendingAction = null, stickRun = false;
+let pendingAction = null, stickRun = false, padVec = null;
 // Always run (Settings): sprint by default, hold B to walk. Off: hold B to run.
 const running = () => (settings.autoRun ? !held.b : !!held.b);
 function updateRunLabel() { const el = document.getElementById('blabel'); if (el) el.textContent = settings.autoRun ? 'Back / Walk' : 'Back / Run'; }
@@ -424,7 +435,8 @@ function drawUI() {
 // ===================== STATE =====================
 let state = null, cur = null, B = null;
 const game = { scene: 'boot' };
-const P = { x: 0, y: 0, fx: 0, fy: 0, t: 1, moving: false, dir: 'down', anim: 0, path: [], hist: [], after: null, marker: null };
+const P = { x: 0, y: 0, fx: 0, fy: 0, t: 1, px: 0.5, pz: 0.5, heading: 0, trail: [], moving: false, dir: 'down', anim: 0, path: [], target: null, hist: [], after: null, marker: null };
+const HEAD = { down: 0, right: Math.PI / 2, up: Math.PI, left: -Math.PI / 2 };
 let busy = false, encSteps = 20, T = 0, VW = W, VH = H, ZM = 1;
 const fx = [];
 
@@ -530,16 +542,19 @@ function blocked(x, y, self) {
   if (W3D.closedTiles && W3D.closedTiles.has(x + ',' + y)) return true;
   if (cur.npcs.some((n) => n !== self && ((n.x === x && n.y === y) || (n.moving && n.fx === x && n.fy === y)))) return true;
   if (pickupAt(x, y)) return true;
-  if (self && ((P.x === x && P.y === y) || (P.moving && P.fx === x && P.fy === y))) return true;
+  if (self && Math.hypot(P.px - (x + 0.5), P.pz - (y + 0.5)) < 0.75) return true;
   return false;
 }
 function placePlayer(x, y, dir) {
-  P.x = P.fx = x; P.y = P.fy = y; P.t = 1; P.moving = false; P.dir = dir || P.dir; P.path = []; P.after = null; P.marker = null; P.rot = null; P.diag = false;
+  P.x = P.fx = x; P.y = P.fy = y; P.t = 1; P.moving = false; P.dir = dir || P.dir; P.path = []; P.target = null; P.after = null; P.marker = null;
+  P.px = x + 0.5; P.pz = y + 0.5; P.heading = HEAD[P.dir];
+  const [bx, by] = DIRS[OPP[P.dir]]; P.trail = [1, 2, 3, 4].map((i) => ({ x: P.px + bx * 0.62 * i, z: P.pz + by * 0.62 * i }));
   P.hist = [{ x, y }, { x, y }, { x, y }, { x, y }, { x, y }, { x, y }];
+  if (window.W3D && W3D.setCamYaw) W3D.setCamYaw(P.heading);
 }
 async function runScript(fn) {
   if (busy) return;
-  busy = true; P.path = []; P.after = null; P.marker = null;
+  busy = true; P.path = []; P.target = null; P.after = null; P.marker = null; P.moving = false;
   try { await fn(); } catch (e) { console.error(e); }
   busy = false;
 }
@@ -563,37 +578,74 @@ function updateMap(dt) {
     if (Math.abs(nx - n.home.x) > 2 || Math.abs(ny - n.home.y) > 2 || blocked(nx, ny, n)) continue;
     n.fx = n.x; n.fy = n.y; n.x = nx; n.y = ny; n.t = 0; n.moving = true;
   }
-  if (P.moving) {
-    P.t += dt / (running() ? 125 : 185); P.anim += dt;
-    if (P.t < 1) return;
-    P.t = 1; P.moving = false;
-    onStep();
-    if (busy) return;
-    if (pendingAction) { const k = pendingAction; pendingAction = null; doMapAction(k); return; }
-  }
+  P.moving = false;
   if (busy || UI.dialog || UI.menus.length || UI.panel || game.scene !== 'map') return;
-  let d = heldDir();
-  if (!d && P.path.length) {
-    d = P.path[0];
-    if (blocked(P.x + DIRS[d][0], P.y + DIRS[d][1])) { P.path = []; P.after = null; P.marker = null; d = null; }
-    else P.path.shift();
-  } else if (!d && P.after) {
-    const a = P.after; P.after = null; P.marker = null;
-    if (a.face) P.dir = a.face;
-    interact();
-    return;
+  // where does the player want to go? (pad or keys, relative to the camera; or a tapped path)
+  let vx = 0, vz = 0;
+  const iv = padVec || ((held.up || held.down || held.left || held.right) ? { x: held.right - held.left, y: held.down - held.up } : null);
+  if (iv && (iv.x || iv.y)) {
+    const l = Math.hypot(iv.x, iv.y), ix = iv.x / l, iy = iv.y / l, yaw = W3D.getCamYaw();
+    vx = Math.sin(yaw) * -iy + -Math.cos(yaw) * ix; vz = Math.cos(yaw) * -iy + Math.sin(yaw) * ix;
+    P.path = []; P.target = null; P.after = null; P.marker = null;
+    // the camera drifts round behind you while you walk forward
+    if (iy < -0.3) { let d = P.heading - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); W3D.setCamYaw(yaw + d * Math.min(1, dt / 1000 * 1.6) * -iy); }
+  } else if (P.target || P.path.length) {
+    if (!P.target) {
+      const d = P.path.shift(), nx = P.x + DIRS[d][0], ny = P.y + DIRS[d][1];
+      if (blocked(nx, ny)) { P.path = []; P.after = null; P.marker = null; return; }
+      P.target = { x: nx + 0.5, z: ny + 0.5 };
+    }
+    const dx = P.target.x - P.px, dz = P.target.z - P.pz, l = Math.hypot(dx, dz);
+    if (l < 0.06) { P.target = null; if (!P.path.length && P.after) { const af = P.after; P.after = null; P.marker = null; if (af.face) { P.dir = af.face; P.heading = HEAD[af.face]; } interact(); } return; }
+    vx = dx / l; vz = dz / l;
+    const yaw = W3D.getCamYaw(); let d = Math.atan2(vx, vz) - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); W3D.setCamYaw(yaw + d * Math.min(1, dt / 1000 * 1.2));
+  } else if (P.after) {
+    const af = P.after; P.after = null; P.marker = null; if (af.face) { P.dir = af.face; P.heading = HEAD[af.face]; } interact(); return;
   }
-  if (!d) { P.anim = 0; return; }
-  P.dir = d; P.rot = null;
-  const nx = P.x + DIRS[d][0], ny = P.y + DIRS[d][1];
-  if (!blocked(nx, ny)) {
-    P.fx = P.x; P.fy = P.y; P.x = nx; P.y = ny; P.t = 0; P.moving = true; P.diag = false;
-    P.hist.unshift({ x: nx, y: ny }); if (P.hist.length > 6) P.hist.pop();
+  if (!vx && !vz) { P.anim = 0; return; }
+  // turn toward the direction of travel, and step forward with collision (sliding along walls)
+  const want = Math.atan2(vx, vz); let dh = want - P.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+  P.heading += dh * Math.min(1, dt / 70);
+  const quarter = Math.round(P.heading / (Math.PI / 2));
+  P.dir = ['down', 'right', 'up', 'left'][((quarter % 4) + 4) % 4];
+  let step = (running() ? 4.1 : 2.4) * dt / 1000;
+  if (P.target) step = Math.min(step, Math.hypot(P.target.x - P.px, P.target.z - P.pz));
+  const ox = P.px, oz = P.pz;
+  if (freeAt(P.px + vx * step, P.pz)) P.px += vx * step;
+  if (freeAt(P.px, P.pz + vz * step)) P.pz += vz * step;
+  const moved = Math.hypot(P.px - ox, P.pz - oz);
+  if (moved < 1e-4) { if (P.target) { P.target = null; P.path = []; P.after = null; P.marker = null; } return; }
+  P.moving = true; P.anim += dt;
+  const last = P.trail[0];
+  if (!last || Math.hypot(last.x - P.px, last.z - P.pz) > 0.12) { P.trail.unshift({ x: P.px, z: P.pz }); if (P.trail.length > 60) P.trail.pop(); }
+  // crossing into a new tile: warps, encounters, scripted spots
+  const tx = Math.floor(P.px), ty = Math.floor(P.pz);
+  if (tx !== P.x || ty !== P.y) {
+    P.fx = P.x; P.fy = P.y; P.x = tx; P.y = ty;
+    P.hist.unshift({ x: tx, y: ty }); if (P.hist.length > 6) P.hist.pop();
+    onStep();
   }
+}
+// is the hero's footprint (a small circle) clear at this spot?
+const FOOT = 0.26;
+function freeAt(x, z) {
+  for (const [ox, oz] of [[-FOOT, -FOOT], [FOOT, -FOOT], [-FOOT, FOOT], [FOOT, FOOT]]) {
+    const tx = Math.floor(x + ox), ty = Math.floor(z + oz);
+    if (tx < 0 || ty < 0 || tx >= cur.w || ty >= cur.h) return false;
+    if (solidTile(tx, ty)) return false;
+  }
+  for (const n of cur.npcs) { const nx = n.fx + (n.x - n.fx) * n.t + 0.5, nz = n.fy + (n.y - n.fy) * n.t + 0.5; if (Math.hypot(nx - x, nz - z) < 0.5) return false; }
+  return true;
+}
+function solidTile(x, y) {
+  const tc = tileAt(x, y);
+  if (SOLID.has(tc) && !((tc === 'H' || tc === 'R') && W3D.openTiles && W3D.openTiles.has(x + ',' + y))) return true;
+  if (W3D.closedTiles && W3D.closedTiles.has(x + ',' + y)) return true;
+  return !!pickupAt(x, y);
 }
 function onStep() {
   state.steps++;
-  if (!P.path.length && !P.after) P.marker = null;
+  if (!P.path.length && !P.target && !P.after) P.marker = null;
   if (state.steps % 4 === 0) for (const m of state.party) if (m.hp > 0) m.fp = Math.min(stats(m).fp, m.fp + 1);
   const w = (cur.def.warps || []).find((w) => w.x === P.x && w.y === P.y);
   if (w) { runScript(() => warp(w.to, w.tx, w.ty, w.dir)); return; }
@@ -608,7 +660,7 @@ async function randomBattle() { await fight(pick(ENCOUNTERS[cur.def.enc]), { bg:
 
 // ---------- camera, tap-to-move ----------
 function camera() {
-  const px = (P.fx + (P.x - P.fx) * P.t) * TS, py = (P.fy + (P.y - P.fy) * P.t) * TS;
+  const px = (P.px - 0.5) * TS, py = (P.pz - 0.5) * TS;
   const mw = cur.w * TS, mh = cur.h * TS;
   const cx = mw <= VW ? (mw - VW) / 2 : clamp(px + HT - VW / 2, 0, mw - VW);
   const cy = mh <= VH ? (mh - VH) / 2 : clamp(py + HT - VH / 2, 0, mh - VH);
@@ -642,22 +694,32 @@ function tapMap(lx, ly) {
   const c = tileAt(tx, ty);
   const interesting = npcAt(tx, ty) || pickupAt(tx, ty) || 'CJSOBLP'.includes(c) || (c === '~' && hasPower('bloom')) || (c === 'K' && (npcAt(tx, ty - 1) || npcAt(tx, ty + 1)));
   if (interesting) {
-    if (Math.abs(tx - P.x) + Math.abs(ty - P.y) === 1) { P.dir = dirTo(P.x, P.y, tx, ty); interact(); return; }
+    if (Math.abs(tx - P.x) + Math.abs(ty - P.y) === 1) { P.dir = dirTo(P.x, P.y, tx, ty); P.heading = HEAD[P.dir]; interact(); return; }
     const r = findPath(tx, ty, true);
     if (!r) { toast("Can't reach that from here."); return; }
-    P.path = r.dirs; P.after = { face: dirTo(r.end[0], r.end[1], tx, ty) }; P.marker = { x: tx, y: ty };
+    P.target = null; P.path = r.dirs; P.after = { face: dirTo(r.end[0], r.end[1], tx, ty) }; P.marker = { x: tx, y: ty };
     return;
   }
   if (blocked(tx, ty)) return;
   const r = findPath(tx, ty, false);
   if (!r) return;
-  P.path = r.dirs; P.after = null; P.marker = { x: tx, y: ty };
+  P.target = null; P.path = r.dirs; P.after = null; P.marker = { x: tx, y: ty };
 }
 
 // ---------- interaction ----------
 function hasPower(p) { return state.party.some((m) => HEROES[m.id].field === p); }
+function npcInFront() {
+  const fx = Math.sin(P.heading), fz = Math.cos(P.heading);
+  let best = null, bd = 1.35;
+  for (const n of cur.npcs) {
+    const nx = n.fx + (n.x - n.fx) * n.t + 0.5 - P.px, nz = n.fy + (n.y - n.fy) * n.t + 0.5 - P.pz, d = Math.hypot(nx, nz);
+    if (d < bd && (nx * fx + nz * fz) / d > 0.55) { bd = d; best = n; }
+  }
+  return best;
+}
 function facingTarget() {
   const [dx, dy] = DIRS[P.dir]; const x = P.x + dx, y = P.y + dy;
+  const near = npcInFront(); if (near) return { kind: 'talk', n: near, x: near.x, y: near.y };
   let n = npcAt(x, y); const c = tileAt(x, y);
   if (!n && c === 'K') { n = npcAt(x + dx, y + dy); if (n) return { kind: 'talk', n, x: x + dx, y: y + dy }; }
   if (n) return { kind: 'talk', n, x, y };
@@ -679,7 +741,7 @@ function interact() {
   const f = facingTarget();
   if (!f) return;
   const { x, y } = f;
-  if (f.kind === 'talk') { const n = f.n; runScript(async () => { if (!n.enemy) n.dir = OPP[P.dir]; await n.talk(n); }); return; }
+  if (f.kind === 'talk') { const n = f.n; runScript(async () => { if (!n.enemy) n.dir = dirTo(n.x, n.y, P.x, P.y) || OPP[P.dir]; await n.talk(n); }); return; }
   if (f.kind === 'take') { runScript(() => takeTrinket(pickupAt(x, y))); return; }
   if (f.kind === 'open') { runScript(() => openChest(x, y)); return; }
   if (f.kind === 'read') { runScript(() => say(cur.def.signs[x + ',' + y])); return; }
@@ -788,9 +850,9 @@ function renderMap() {
     const sp = W3D.toScreen(P.marker.x + 0.5, 0.05, P.marker.y + 0.5), r = 9 + Math.sin(T / 150) * 1.5;
     bx.strokeStyle = 'rgba(255,242,192,0.9)'; bx.lineWidth = 1.5; bx.beginPath(); bx.ellipse(sp.x, sp.y, r, r * 0.55, 0, 0, 6.3); bx.stroke();
   }
-  const f = !busy && !P.moving && !UI.dialog && !UI.menus.length && !P.path.length ? facingTarget() : null;
+  const f = !busy && !UI.dialog && !UI.menus.length && !P.path.length && !P.target ? facingTarget() : null;
   if (f) {
-    const sp = W3D.toScreen(f.x + 0.5, f.kind === 'talk' ? 1.75 : 1.15, f.y + 0.5);
+    const sp = f.kind === 'talk' && f.n ? W3D.toScreen(f.n.fx + (f.n.x - f.n.fx) * f.n.t + 0.5, 1.15, f.n.fy + (f.n.y - f.n.fy) * f.n.t + 0.5) : W3D.toScreen(f.x + 0.5, 0.95, f.y + 0.5);
     const ox = Math.round(sp.x), oy = Math.round(sp.y + Math.sin(T / 200));
     bx.fillStyle = OUTLINE_COL; bx.fillRect(ox - 8, oy - 8, 17, 13); bx.fillRect(ox - 2, oy + 5, 5, 3);
     bx.fillStyle = '#fff8e8'; bx.fillRect(ox - 7, oy - 7, 15, 11); bx.fillRect(ox - 1, oy + 4, 3, 3);

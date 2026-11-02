@@ -241,7 +241,7 @@ function dispose(group) {
 
 // ------------------------------------------------------------------ map building
 const WATERISH = new Set(['~', '%', 'o', '|']);
-const WALLS = { M: 1.7, '#': 1.15, Q: 2.4 };
+const WALLS = { M: 1.7, '#': 3.0, Q: 2.4 };
 function groundColor(c, x, y, def) {
   const v = hash(x, y);
   if (def.ground === 'W') return c === 'g' ? 0xb07a4a : 0xb38050;
@@ -378,6 +378,37 @@ function building(kind, fw, fh) {
 
 const KF_WIDE = ['kf/Rock_1_A', 'kf/Rock_1_C', 'kf/Rock_1_E'], KF_SLAB = ['kf/Rock_1_A', 'kf/Rock_1_C', 'kf/Rock_1_E', 'kf/Rock_1_J', 'kf/Rock_1_M'], KF_BOULDER = ['kf/Rock_3_A', 'kf/Rock_3_C', 'kf/Rock_3_E', 'kf/Rock_3_G'];
 const kpick = (arr, h) => arr[((h * 97) | 0) % arr.length];
+// past the edge of the playable map, keep the world going: forest, cliff plateaus, the river and roads carry on
+function buildOutskirts(m, def, outdoor) {
+  const g = new THREE.Group(), PAD = 14, items = {}, boxes = [], water = [], roads = [];
+  const add = (k, it) => (items[k] = items[k] || []).push(it);
+  for (let y = -PAD; y < m.h + PAD; y++) for (let x = -PAD; x < m.w + PAD; x++) {
+    if (x >= 0 && y >= 0 && x < m.w && y < m.h) continue;
+    const t = m.t[Math.max(0, Math.min(m.h - 1, y))][Math.max(0, Math.min(m.w - 1, x))], h = hash(x + 400, y + 400), h2 = hash(y + 900, x + 77);
+    if (t === 'M' || t === 'v' || t === '#') { boxes.push({ x, y, hgt: t === '#' ? WALLS['#'] : CLIFF_H }); if (outdoor && h < 0.3) add('nature/Pine_' + (1 + ((h * 30) | 0) % 3), { x: x + 0.5, y: CLIFF_H, z: y + 0.5, r: h2 * TAU, s: 0.9 + h2 * 0.5 }); }
+    else if (t === '~' || t === '|') water.push({ x, y });
+    else if (t === '=') roads.push({ x, y });
+    else if (outdoor && (t === 'T' || h < 0.12)) { if (h < 0.55) add(h < 0.32 ? 'gen/FluffyTree_' + (((h * 100) | 0) % 4) : 'nature/Pine_' + (1 + ((h * 100) | 0) % 3), { x: x + 0.5 + (h2 - 0.5) * 0.5, z: y + 0.5 + (h - 0.5) * 0.5, r: h2 * TAU, s: 0.85 + h2 * 0.5 }); }
+  }
+  if (outdoor) {
+    const gnd = new THREE.Mesh(new THREE.PlaneGeometry(m.w + PAD * 2 + 40, m.h + PAD * 2 + 40), new THREE.MeshStandardMaterial({ color: 0x5e9a40, map: TEX.ground, roughness: 1 }));
+    gnd.rotation.x = -Math.PI / 2; gnd.position.set(m.w / 2, -0.03, m.h / 2); gnd.receiveShadow = true; gnd.userData.own = true; g.add(gnd);
+  }
+  const sizes = { FluffyTree: 3.2, Pine: 3.0 };
+  for (const [k, its] of Object.entries(items)) instances(g, k, sizes[k.includes('Fluffy') ? 'FluffyTree' : 'Pine'], 'h', its, { cast: false });
+  if (boxes.length) {
+    const top = new THREE.MeshStandardMaterial({ color: outdoor ? 0x62a044 : 0x0b0910, map: outdoor ? TEX.ground : null, roughness: 1 }), side = new THREE.MeshStandardMaterial({ color: outdoor ? 0xa89888 : 0x2a2234, map: outdoor ? TEX.rock : null, roughness: 1 });
+    for (const hgt of [...new Set(boxes.map((b) => b.hgt))]) {
+      const bb = boxes.filter((b) => b.hgt === hgt), geo = new THREE.BoxGeometry(1, hgt + 0.6, 1); geo.translate(0, (hgt + 0.6) / 2 - 0.6, 0);
+      const im = new THREE.InstancedMesh(geo, [side, side, top, side, side, side], bb.length);
+      bb.forEach((b, i) => { _m.makeTranslation(b.x + 0.5, 0, b.y + 0.5); im.setMatrixAt(i, _m); }); im.receiveShadow = true; im.userData.own = true; g.add(im);
+    }
+  }
+  const quads = (list, mat, y) => { if (!list.length) return; const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2); const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((q, i) => { _m.makeTranslation(q.x + 0.5, y, q.y + 0.5); im.setMatrixAt(i, _m); }); im.userData.own = true; g.add(im); };
+  quads(water, new THREE.MeshStandardMaterial({ color: 0x1f8e9e, roughness: 0.15, metalness: 0.05 }), -0.12);
+  quads(roads, new THREE.MeshStandardMaterial({ color: 0xb89a68, map: TEX.ground, roughness: 1 }), -0.01);
+  return g;
+}
 function buildMap(m, st) {
   dispose(world); dispose(dynGroup);
   for (const a of actors.values()) a.obj.removeFromParent();
@@ -455,7 +486,6 @@ function buildMap(m, st) {
     if (cave && c === '#') {
       const edge = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dy]) => { const t = m.t[y + dy] && m.t[y + dy][x + dx]; return t && t !== '#'; });
       if (edge) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + edge[0] * 0.3, y: -0.2, z: cz + edge[1] * 0.3, r, s: 1.5 + h2 * 0.7 });
-      else if (h < 0.6) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + (h2 - 0.5) * 0.5, y: 0.75, z: cz, r, s: 1.1 + h2 * 0.8 });
     }
     if (cave && c === '_' && h < 0.14) add('nature/Pebble_Round_' + (h2 < 0.5 ? 1 : 3), { x: cx, z: cz, r, s: 1 });
     if (outdoor && c === 'M') {
@@ -474,8 +504,8 @@ function buildMap(m, st) {
     }
   }
   const SIZES = { FluffyTree: [3.2, 'h'], CommonTree: [3.1, 'h'], Pine: [3.0, 'h'], Bush_Common: [1.0, 'w'], Bush_Common_Flowers: [0.95, 'w'], Flower_3_Group: [0.5, 'h'], Flower_4_Group: [0.5, 'h'],
-    Grass_Wispy_Tall: [0.75, 'h'], Grass_Common_Tall: [0.7, 'h'], Grass_Common_Short: [0.28, 'h'], Clover_1: [0.35, 'w'], Pebble_Round: [0.25, 'w'], Mushroom_Common: [0.28, 'h'], Mushroom_Laetiporus: [0.45, 'h'],
-    Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], Rock_1: [1.0, 'w'], Rock_3: [0.85, 'w'], Bush_1: [1.0, 'w'], Bush_2: [1.1, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.75, 'h'], Barrel_Apples: [0.75, 'h'], Crate_Wooden: [0.6, 'h'], Plant_7: [0.8, 'h'], Pot_1: [0.4, 'h'],
+    Grass_Wispy_Tall: [0.55, 'h'], Grass_Common_Tall: [0.5, 'h'], Grass_Common_Short: [0.28, 'h'], Clover_1: [0.35, 'w'], Pebble_Round: [0.25, 'w'], Mushroom_Common: [0.28, 'h'], Mushroom_Laetiporus: [0.45, 'h'],
+    Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], Rock_1: [1.0, 'w'], Rock_3: [0.85, 'w'], Bush_1: [1.0, 'w'], Bush_2: [1.1, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.55, 'h'], Barrel_Apples: [0.55, 'h'], Crate_Wooden: [0.45, 'h'], Plant_7: [0.8, 'h'], Pot_1: [0.4, 'h'],
     Bookcase_2: [1.9, 'h'], Table_Large: [1.1, 'w'], Stool: [0.45, 'h'], Bed_Twin1: [1.0, 'w'], Workbench: [1.0, 'w'] };
   const sizeOf = (k) => { const n = k.split('/')[1]; for (const [p, v] of Object.entries(SIZES)) if (n === p || n.startsWith(p + '_') || n.startsWith(p)) return v; return [1, 'h']; };
   if (blossoms.length) {
@@ -485,6 +515,7 @@ function buildMap(m, st) {
     bm.receiveShadow = true; bm.userData.own = true; world.add(bm);
   }
   for (const [ck, items] of Object.entries(L)) { const k = ck.split('|')[0]; const [sz, mode] = sizeOf(k); const caveRock = cave && k.includes('Rock_Medium'), sunRock = outdoor && k.includes('Rock_Medium'); instances(world, k, sz, mode, items, { tint: caveRock ? 0x8a7aa8 : sunRock ? [2.2, 2.25, 2.4] : null, cast: !k.includes('Grass') && !k.includes('Clover') && !k.includes('Pebble') && !k.includes('Flower') }); }
+  if (outdoor || cave) world.add(buildOutskirts(m, def, outdoor));
   // buildings: collision follows the real model, not the rectangle reserved for it on the map
   const open = new Set(), rc = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), org = new THREE.Vector3();
   const closed = new Set();
@@ -513,7 +544,7 @@ function buildMap(m, st) {
   if (outdoor) { scene.background = new THREE.Color(0xa8d8f0); scene.fog = new THREE.Fog(0xa8d8f0, 20, 42); hemi.intensity = 1.25; sun.intensity = 2.4; hemi.color.set(0xd8ecff); hemi.groundColor.set(0x5a6a3a); }
   else if (interior) { scene.background = new THREE.Color(0x1a1410); scene.fog = null; hemi.intensity = 1.1; sun.intensity = 1.4; hemi.color.set(0xfff0d8); hemi.groundColor.set(0x6a4a30); }
   else { scene.background = new THREE.Color(0x07050c); scene.fog = new THREE.Fog(0x07050c, 14, 30); }
-  mapInfo = { id: m.id, def, w: m.w, h: m.h, glows, outdoor, cave, interior };
+  mapInfo = { id: m.id, def, w: m.w, h: m.h, t: m.t, glows, outdoor, cave, interior };
   setCaveLight(st);
   rebuildDynamic(m, st);
 }
@@ -532,14 +563,14 @@ function rebuildDynamic(m, st) {
     if (c === 'O') { const o = place('kf/Rock_3_A', 0.95, 'w'); o.position.set(cx, 0, cz); o.rotation.y = h * TAU; dynGroup.add(o); }
     else if (c === 'B') { const o = place('nature/Bush_Common', 1.1, 'w'); o.position.set(cx, 0, cz); o.rotation.y = h * TAU; dynGroup.add(o); }
     else if (c === 'C' || c === 'c') {
-      const o = place('props/Chest_Wood', 0.8, 'w'); o.position.set(cx, 0, cz); dynGroup.add(o);
+      const o = place('props/Chest_Wood', 0.62, 'w'); o.position.set(cx, 0, cz); dynGroup.add(o);
       const g = G['props/Chest_Wood'], mixer = new THREE.AnimationMixer(o);
       const opening = c === 'c' && prev && prev[y][x] === 'C';
       const clip = g.animations.find((a) => a.name === (c === 'C' ? 'Chest_Closed' : opening ? 'Chest_Open' : 'Chest_Opened'));
       if (clip) { const a = mixer.clipAction(clip); a.clampWhenFinished = true; a.setLoop(THREE.LoopOnce); a.play(); }
       o.userData.mixer = mixer;
     } else if (c === 'J') {
-      const o = place('props/Chest_Wood', 0.85, 'w'); o.position.set(cx, 0, cz);
+      const o = place('props/Chest_Wood', 0.66, 'w'); o.position.set(cx, 0, cz);
       o.traverse((q) => { if (q.isMesh) { q.material = q.material.clone(); q.material.color.multiply(new THREE.Color(0x8a9ab8)); } });
       const lock = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.06), new THREE.MeshStandardMaterial({ color: 0xffc840, metalness: 0.8, roughness: 0.3, emissive: 0x402800 }));
       lock.position.set(0, 0.36, 0.33); lock.userData.own = true; o.add(lock);
@@ -608,11 +639,37 @@ function playAct(a, name, fade = 0.18) {
   a.cur = name;
 }
 const DIR_ROT = { down: 0, right: Math.PI / 2, up: Math.PI, left: -Math.PI / 2 };
+// people on the map are scaled so a hero comes up to about three quarters of a door
+const MAP_SCALE = 0.62;
+let camYaw = Math.PI, camDist = 3.6;
+function getCamYaw() { return camYaw; }
+function setCamYaw(y) { camYaw = y; }
+// how tall the solid thing on a tile is (for keeping the camera out of walls)
+function solidHeight(x, z) {
+  if (!mapInfo) return 0;
+  const tx = Math.max(0, Math.min(mapInfo.w - 1, Math.floor(x))), tz = Math.max(0, Math.min(mapInfo.h - 1, Math.floor(z))), t = mapInfo.t[tz][tx];
+  if (t === 'M' || t === 'v') return CLIFF_H;
+  if (t === '#') return WALLS['#'];
+  if (t === 'Q') return 2.4;
+  if ((t === 'H' || t === 'R') && !(W3D.openTiles && W3D.openTiles.has(tx + ',' + tz))) return 3.2;
+  if (W3D.closedTiles && W3D.closedTiles.has(tx + ',' + tz)) return 2.5;
+  return 0;
+}
+// a point at arc distance d back along the party's trail
+function trailPoint(P, d) {
+  let px = P.px, pz = P.pz, left = d;
+  for (const q of P.trail) {
+    const seg = Math.hypot(q.x - px, q.z - pz);
+    if (seg >= left) { const k = left / seg; return { x: px + (q.x - px) * k, z: pz + (q.z - pz) * k, hx: px - q.x, hz: pz - q.z }; }
+    left -= seg; px = q.x; pz = q.z;
+  }
+  return { x: px, z: pz, hx: 0, hz: 0 };
+}
 function actor(id, who) {
   let a = actors.get(id);
   if (!a) {
     const c = castOf(who);
-    a = makeActor(c[0], c[1], c[2], c[3]); actors.set(id, a); scene.add(a.obj);
+    a = makeActor(c[0], c[1], c[2], c[3]); a.obj.scale.setScalar(MAP_SCALE); actors.set(id, a); scene.add(a.obj);
   }
   return a;
 }
@@ -640,29 +697,23 @@ function monPlay(m, k) {
 let camTarget = new THREE.Vector3(), camInit = false;
 function syncMap(dt, S) {
   const { cur, P, state, T } = S;
-  // party
-  const lerpT = P.moving ? P.t : 1;
-  const px = P.fx + (P.x - P.fx) * lerpT + 0.5, pz = P.fy + (P.y - P.fy) * lerpT + 0.5;
+  // party: the leader moves freely; companions follow along the trail they walked
+  const px = P.px, pz = P.pz;
   const ids = new Set();
   state.party.forEach((m, i) => {
     const pid = 'party_' + sheetOf(m.id), a = actor(pid, m.id); ids.add(pid);
-    let x = px, z = pz, dir = P.dir, moving = P.moving;
-    if (i > 0) {
-      const A2 = P.hist[i + 1] || P.hist[P.hist.length - 1], B2 = P.hist[i] || A2;
-      x = A2.x + (B2.x - A2.x) * lerpT + 0.5; z = A2.y + (B2.y - A2.y) * lerpT + 0.5;
-      moving = P.moving && (B2.x !== A2.x || B2.y !== A2.y);
-      dir = moving ? S.dirTo(A2.x, A2.y, B2.x, B2.y) : (P.hist[i - 1] ? S.dirTo(B2.x, B2.y, P.hist[i - 1].x, P.hist[i - 1].y) : P.dir);
-      if (Math.abs(x - px) < 0.2 && Math.abs(z - pz) < 0.2) { x -= 0.2 * i; z -= 0.12; }
-    }
     a.obj.visible = true;
-    a.obj.position.set(x, 0, z);
-    // face the actual direction of travel (diagonals included)
-    if (i === 0) a.rotTarget = P.rot != null ? P.rot : DIR_ROT[dir];
-    else if (moving) { const A3 = P.hist[i + 1] || P.hist[P.hist.length - 1], B3 = P.hist[i] || A3; a.rotTarget = Math.atan2(B3.x - A3.x, B3.y - A3.y); }
-    else a.rotTarget = DIR_ROT[dir];
-    // a jog whose stride matches how fast the party crosses tiles, so feet don't slide
-    playAct(a, moving ? 'Running_A' : 'Idle_A', 0.1);
-    if (a.actions.Running_A) a.actions.Running_A.timeScale = S.running ? 1.45 : 1.05;
+    if (i === 0) { a.obj.position.set(px, 0, pz); a.rotTarget = P.heading; }
+    else {
+      // walk a little to either side of the trail so the camera can see past them
+      const t = trailPoint(P, 0.55 + i * 0.55), l = Math.hypot(t.hx, t.hz) || 1, side = (i % 2 ? 1 : -1) * 0.38;
+      a.obj.position.set(t.x + (t.hz / l) * side, 0, t.z - (t.hx / l) * side);
+      // fade out anyone standing right in front of the camera
+      a.obj.visible = Math.hypot(camera.position.x - a.obj.position.x, camera.position.z - a.obj.position.z) > 1.1;
+      if (t.hx || t.hz) a.rotTarget = Math.atan2(t.hx, t.hz);
+    }
+    playAct(a, P.moving ? 'Running_A' : 'Idle_A', 0.1);
+    if (a.actions.Running_A) a.actions.Running_A.timeScale = S.running ? 1.5 : 1.1;
   });
   for (const n of cur.npcs) {
     const id = 'npc_' + cur.id + '_' + n.id; ids.add(id);
@@ -695,30 +746,27 @@ function syncMap(dt, S) {
   // water / falls
 
   for (const f of falls) { if (f.material.map) f.material.map.offset.y = (T / 700) % 1; else { const k = f.userData.ph; f.scale.setScalar(0.8 + Math.sin(T / 160 + k * 1.7) * 0.25); f.position.y = -0.02 + Math.abs(Math.sin(T / 230 + k)) * 0.08; } }
-  // camera
+  // camera: behind the hero's shoulder, pulled in when a wall or building is in the way
   const interior = mapInfo.interior;
-  const tx = interior ? mapInfo.w / 2 : px, tz = interior ? mapInfo.h / 2 + 0.6 : pz;
-  const halfW = 4.2, halfTop = 4.0, halfBot = 4.6;
-  const cx = interior ? tx : Math.max(halfW + 1, Math.min(mapInfo.w - halfW - 1, tx));
-  const cz = interior ? tz : Math.max(halfTop + 1, Math.min(mapInfo.h - halfBot, tz));
-  const goal = new THREE.Vector3(cx, 0, cz);
-  if (!camInit) { camTarget.copy(goal); camInit = true; } else camTarget.lerp(goal, Math.min(1, dt / 55));
-  const dist = interior ? 9.5 : 13.5;
-  if (W3D.cam3p) {
-    // experimental third-person view: low, behind the hero's shoulder, looking where they face
-    const yaw = W3D.cam3p.yaw != null ? W3D.cam3p.yaw : DIR_ROT[P.dir], back = W3D.cam3p.dist || 3.4, up = W3D.cam3p.height || 1.9;
-    camera.fov = 55; camera.updateProjectionMatrix();
-    camera.position.set(px - Math.sin(yaw) * back + Math.cos(yaw) * 0.6, up, pz - Math.cos(yaw) * back - Math.sin(yaw) * 0.6);
-    camera.lookAt(px + Math.sin(yaw) * 4, 0.9, pz + Math.cos(yaw) * 4);
-    if (scene.fog) { scene.fog.near = 14; scene.fog.far = 38; }
-  } else {
-    if (camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); }
-    camera.position.set(camTarget.x, camTarget.y + dist * 0.87, camTarget.z + dist * 0.5);
-    camera.lookAt(camTarget.x, 0, camTarget.z - 0.6);
+  const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
+  const want = interior ? 3.0 : 4.4, rise = interior ? 1.8 : 1.75, headY = 0.62;
+  let free = want;
+  for (let s2 = 0.45; s2 <= want; s2 += 0.15) {
+    const x = px - fx * s2, z = pz - fz * s2, y = headY + rise * (s2 / want);
+    if (solidHeight(x, z) > y - 0.1) { free = Math.max(0.5, s2 - 0.3); break; }
   }
-  sun.position.set(camTarget.x - 6, 14, camTarget.z + 5); sun.target.position.copy(camTarget);
+  camDist += (free - camDist) * Math.min(1, dt / (free < camDist ? 40 : 260));
+  const k = camDist / want;
+  const goal = new THREE.Vector3(px - fx * camDist, headY + rise * k + 0.35 * (1 - k), pz - fz * camDist);
+  if (!camInit) { camera.position.copy(goal); camInit = true; }
+  else camera.position.lerp(goal, Math.min(1, dt / 45));
+  camTarget.set(px, 0, pz);
+  if (camera.fov !== 52) { camera.fov = 52; camera.updateProjectionMatrix(); }
+  camera.lookAt(px + fx * 2.0, 0.5, pz + fz * 2.0);
+  if (scene.fog && mapInfo.outdoor) { scene.fog.near = 16; scene.fog.far = 44; }
+  sun.position.set(px + fx * 5 - 6, 14, pz + fz * 5 + 5); sun.target.position.set(px + fx * 5, 0, pz + fz * 5);
   // lights in caves / interiors
-  playerLight.position.set(px, 3.2, pz + 1.6);
+  playerLight.position.set(px, 2.2, pz);
   const near = (mapInfo.glows || []).filter((g) => !g.trinket || !(g.trinket in state.trinkets)).map((g) => ({ g, d: (g.x - px) ** 2 + (g.z - pz) ** 2 })).sort((a, b) => a.d - b.d);
   glowLights.forEach((l, i) => {
     const n = near[i];
@@ -1138,5 +1186,5 @@ function toScreen(wx, wy, wz) { return project(camera, wx, wy, wz); }
 function tileChanged(m, st) { if (mapInfo && m.id === mapInfo.id) { rebuildDynamic(m, st); setCaveLight(st); } }
 function hideActors() { for (const a of actors.values()) a.obj.visible = false; }
 
-window.W3D = { figure, setQuality, init, load, resize, buildMap, syncMap, render, pickTile, toScreen, tileChanged, resetCamera, battleStart, battleSync, battleEnd, enemyScreen, titleSync, portrait, hideActors, setCaveLight, ENEMY_MODEL };
+window.W3D = { getCamYaw, setCamYaw, figure, setQuality, init, load, resize, buildMap, syncMap, render, pickTile, toScreen, tileChanged, resetCamera, battleStart, battleSync, battleEnd, enemyScreen, titleSync, portrait, hideActors, setCaveLight, ENEMY_MODEL };
 window.__w3dReady && window.__w3dReady();
