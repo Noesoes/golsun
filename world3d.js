@@ -124,7 +124,7 @@ function makeTextures() {
     }),
     blossoms: canvasTex(128, 128, (g, w, h) => {
       g.clearRect(0, 0, w, h);
-      for (let i = 0; i < 26; i++) {
+      for (let i = 0; i < 9; i++) {
         const x = 8 + rnd() * (w - 16), y = 8 + rnd() * (h - 16), r = 2.2 + rnd() * 1.8, yellow = rnd() < 0.18;
         g.fillStyle = yellow ? '#ffe070' : '#fbfaf0';
         for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + rnd(); g.beginPath(); g.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, r * 0.75, 0, Math.PI * 2); g.fill(); }
@@ -385,7 +385,7 @@ function buildMap(m, st) {
       const foamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xbfe8ff, emissiveIntensity: 0.35, roughness: 0.6, transparent: true, opacity: 0.92 });
       for (let k = 0; k < 7; k++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16 + hash(x + k, y) * 0.14, 0), foamMat); b.position.set(cx + (k / 6 - 0.5) * 0.95, -0.02, y + 0.15 + hash(k, x) * 0.35); b.userData.own = true; b.userData.ph = k; world.add(b); falls.push(b); }
     }
-    if (outdoor && (c === '.' || c === ',' || c === 'b') && h2 > 0.35) blossoms.push({ x: cx + (h - 0.5) * 0.4, z: cz + (h2 - 0.5) * 0.4, r: h * TAU, s: 0.8 + h2 * 0.5 });
+    if (outdoor && (c === '.' || c === ',' || c === 'b') && h2 > 0.72) blossoms.push({ x: cx + (h - 0.5) * 0.4, z: cz + (h2 - 0.5) * 0.4, r: h * TAU, s: 0.8 + h2 * 0.5 });
     // grass detail on open ground
     if (outdoor && (c === '.' || c === ',')) {
       if (h < 0.45) add('nature/Grass_Common_Short', { x: cx + (h2 - 0.5) * 0.8, z: cz + (h - 0.5) * 0.8, r, s: 0.7 + h2 * 0.6 });
