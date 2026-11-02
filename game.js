@@ -1295,11 +1295,11 @@ function drawBattleUI() {
   });
   if (B.result) {
     const r = B.result, lines = [`+${r.xp} XP    +${r.gold} coins`].concat(r.drop ? [`Found ${ITEMS[r.drop].slot ? 'gear: ' : 'a '}${ITEMS[r.drop].name}!`] : []).concat(r.ups);
-    const h = 30 + lines.length * 12;
-    box(W / 2 - 100, 30, 200, h, { border: COL.gold });
-    font(12, true); text('Victory!', W / 2, 46, COL.gold, 'center');
-    font(9); lines.forEach((l, i) => text(l, W / 2, 61 + i * 12, i === 0 ? COL.text : COL.hp, 'center'));
-    font(7); text('tap to continue', W / 2, 30 + h - 4, COL.dim, 'center');
+    const lh = lines.length > 9 ? 10 : 12, bw = Math.min(W - 12, 236), h = 38 + lines.length * lh + 16;
+    box(W / 2 - bw / 2, 30, bw, h, { border: COL.gold });
+    font(12, true); text('Victory!', W / 2, 47, COL.gold, 'center');
+    font(lh === 10 ? 8 : 9); lines.forEach((l, i) => text(l, W / 2, 63 + i * lh, i === 0 ? COL.text : COL.hp, 'center'));
+    font(7); text('tap to continue', W / 2, 30 + h - 9, COL.dim, 'center');
     hits.push({ x: 0, y: 0, w: W, h: H, fn: () => handleInput('a') });
   }
 }
