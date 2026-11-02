@@ -10,6 +10,7 @@ Rebuild with: python3 tools/build_assets.py "/path/to/Ninja Adventure - Asset Pa
     (FBX converted with FBX2glTF, textures attached and resized)
   - KayKit Character Pack: Adventurers by Kay Lousberg: https://kaylousberg.itch.io/kaykit-adventurers
   - KayKit Medieval Hexagon Pack by Kay Lousberg: https://kaylousberg.itch.io/kaykit-medieval-hexagon
+  - KayKit Forest Nature Pack by Kay Lousberg (rocks and bushes): https://kaylousberg.itch.io/kaykit-forest
 Rebuild with: tools/build_3d.sh
 
 three.js (lib/) is MIT licensed, see lib/THREE_LICENSE.txt.

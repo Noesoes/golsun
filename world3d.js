@@ -17,6 +17,7 @@ const FILES = {
   props: ['Chest_Wood', 'Bed_Twin1', 'Bookcase_2', 'Table_Large', 'Chair_1', 'Stool', 'Barrel', 'Barrel_Apples', 'Lantern_Wall', 'Anvil', 'Cauldron', 'Workbench',
     'Potion_1', 'Shelf_Simple', 'Crate_Wooden', 'FarmCrate_Apple', 'CandleStick_Stand', 'Bench', 'Vase_2', 'Pot_1'],
   bld: ['home_A_red', 'home_B_yellow', 'tavern_blue', 'market_green', 'blacksmith_red', 'well_blue', 'windmill_yellow', 'fence_wood_straight', 'waterlily_A', 'waterlily_B', 'sack', 'resource_lumber'],
+  kf: ['Rock_1_A', 'Rock_1_C', 'Rock_1_E', 'Rock_1_J', 'Rock_1_M', 'Rock_3_A', 'Rock_3_C', 'Rock_3_E', 'Rock_3_G', 'Bush_1_A', 'Bush_2_A'],
   cute: ['Alien_Tall', 'Cactus', 'Bee', 'Pig', 'Mushroom', 'Cyclops', 'Bat', 'Ghost', 'YellowDragon'],
   chars: ['Ranger', 'Barbarian', 'Mage', 'Knight', 'Rogue', 'Rogue_Hooded', 'Rig_Medium_General', 'Rig_Medium_MovementBasic'],
 };
@@ -320,6 +321,8 @@ function building(kind, fw, fh) {
   return o;
 }
 
+const KF_WIDE = ['kf/Rock_1_A', 'kf/Rock_1_C', 'kf/Rock_1_E'], KF_SLAB = ['kf/Rock_1_A', 'kf/Rock_1_C', 'kf/Rock_1_E', 'kf/Rock_1_J', 'kf/Rock_1_M'], KF_BOULDER = ['kf/Rock_3_A', 'kf/Rock_3_C', 'kf/Rock_3_E', 'kf/Rock_3_G'];
+const kpick = (arr, h) => arr[((h * 97) | 0) % arr.length];
 function buildMap(m, st) {
   dispose(world); dispose(dynGroup);
   for (const a of actors.values()) a.obj.removeFromParent();
@@ -343,7 +346,7 @@ function buildMap(m, st) {
     const c = m.t[y][x], cx = x + 0.5, cz = y + 0.5, h = hash(x, y), h2 = hash(y + 17, x + 3), r = h2 * TAU;
     if (c === 'T' && y >= m.h - 2) {
       // the bottom edge sits between the camera and the player: low hedges instead of tall trees
-      if (y === m.h - 2 || (x + y) % 2) add('nature/Bush_Common_Flowers', { x: cx + (h2 - 0.5) * 0.3, z: cz, r, s: 1.1 + h * 0.4 });
+      if (y === m.h - 2 || (x + y) % 2) add(h < 0.6 ? 'kf/Bush_1_A' : 'kf/Bush_2_A', { x: cx + (h2 - 0.5) * 0.3, z: cz, r, s: 1.0 + h * 0.4 });
     } else if (c === 'T') {
       const deep = [[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => { const t = m.t[y + dy] && m.t[y + dy][x + dx]; return !t || t === 'T'; });
       if (deep && (x + 2 * y) % 3) continue;
@@ -353,7 +356,7 @@ function buildMap(m, st) {
     else if (c === 'b') { add('nature/Flower_3_Group', { x: cx - 0.2, z: cz, r, s: 1.1 }); add('nature/Flower_4_Group', { x: cx + 0.2, z: cz + 0.15, r, s: 1.1 }); add('nature/Grass_Common_Short', { x: cx, z: cz - 0.2, r, s: 1 }); }
     else if (c === ',') { add('nature/Flower_3_Group', { x: cx - 0.2, z: cz - 0.1, r, s: 1 }); if (h < 0.4) add('nature/Flower_4_Group', { x: cx + 0.22, z: cz + 0.2, r: r + 2, s: 0.8 }); }
     else if (c === '"') for (let i = 0; i < 4; i++) { const a = hash(x * 5 + i, y * 3 - i); add(i === 0 ? 'nature/Grass_Wispy_Tall' : 'nature/Grass_Common_Tall', { x: cx + (a - 0.5) * 0.85, z: cz + (hash(i, x + y) - 0.5) * 0.85, r: a * TAU, s: 0.8 + a * 0.5 }); }
-    else if (c === 'r') add('nature/Rock_Medium_2', { x: cx, z: cz, r, s: 0.9 + h * 0.3 });
+    else if (c === 'r') add(outdoor ? kpick(KF_BOULDER, h) : 'nature/Rock_Medium_2', { x: cx, z: cz, r, s: 0.9 + h * 0.3 });
     else if (c === 'F') add('bld/fence_wood_straight', { x: cx, z: cz, r: (m.t[y][x - 1] === 'F' || m.t[y][x + 1] === 'F') ? Math.PI / 2 : 0, s: 1 });
     else if (c === 'u') add(interior ? 'props/Barrel' : 'props/Barrel_Apples', { x: cx, z: cz, r, s: 1 });
     else if (c === 'x') add('props/Crate_Wooden', { x: cx, z: cz, r: r * 0.1, s: 1 });
@@ -374,8 +377,8 @@ function buildMap(m, st) {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(interior ? 0.8 : 1.1, interior ? 0.5 : 1.2), mat); p.rotation.x = -Math.PI / 2; p.position.set(cx, 0.02, cz); p.userData.own = true; world.add(p);
     } else if (c === 'v') {
       const o = caveMouth(); o.position.set(cx, 0, y + 1); world.add(o);
-      add('nature/Rock_Medium_1', { x: cx - 0.75, z: y + 1.15, r: 0.4, s: 1.6 }); add('nature/Rock_Medium_3', { x: cx + 0.78, z: y + 1.1, r: 2.1, s: 1.5 });
-      add('nature/Rock_Medium_2', { x: cx + 0.1, y: 1.75, z: y + 0.95, r: 1.2, s: 1.3 });
+      add('kf/Rock_1_J', { x: cx - 0.8, z: y + 1.1, r: 0.2, s: 1.3 }); add('kf/Rock_1_M', { x: cx + 0.82, z: y + 1.1, r: -0.3, s: 1.3 });
+      add('kf/Rock_1_A', { x: cx + 0.05, y: 1.8, z: y + 0.9, r: 0, s: 1.1 });
       for (const sx of [-1, 1]) { const t = lampPost(); t.position.set(cx + sx * 1.15, 0, y + 1.35); t.scale.setScalar(0.8); world.add(t); }
     } else if (c === '~' && outdoor && y > 0 && (m.t[y - 1][x] === 'M' || y === 0)) {
       // waterfall where the river leaves the cliffs
@@ -401,20 +404,23 @@ function buildMap(m, st) {
     }
     if (cave && c === '_' && h < 0.14) add('nature/Pebble_Round_' + (h2 < 0.5 ? 1 : 3), { x: cx, z: cz, r, s: 1 });
     if (outdoor && c === 'M') {
-      const front = m.t[y + 1] && m.t[y + 1][x] !== 'M' && m.t[y + 1][x] !== 'v';
+      const front = m.t[y + 1] && !['M', 'v', '~'].includes(m.t[y + 1][x]);
       if (front) {
         // stacked stone blocks along the cliff face, like a natural rock wall
-        add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + (h2 - 0.5) * 0.3, y: -0.15, z: cz + 0.55, r, s: 1.5 + h2 * 0.5 });
-        if (h > 0.25) add('nature/Rock_Medium_' + (1 + ((h2 * 30) | 0) % 3), { x: cx + (h - 0.5) * 0.4, y: 1.0, z: cz + 0.42, r: r + 1.3, s: 1.2 + h * 0.5 });
+        const opening = ['~', 'v'].includes(m.t[y][x - 1]) || ['~', 'v'].includes(m.t[y][x + 1]);
+        if (!opening) add(kpick(KF_WIDE, h), { x: cx + (h2 - 0.5) * 0.2, y: -0.15, z: cz + 0.48, r: (h2 - 0.5) * 0.3, s: 1.45 + h2 * 0.35 });
+        else add(kpick(KF_BOULDER, h), { x: cx + (m.t[y][x - 1] === '~' || m.t[y][x - 1] === 'v' ? 0.15 : -0.15), y: 0, z: cz + 0.7, r, s: 0.7 });
+        if (!opening) add(kpick(h > 0.7 ? KF_SLAB : KF_WIDE, h2), { x: cx + (h - 0.5) * 0.3, y: 1.0, z: cz + 0.25, r: (h - 0.5) * 0.5, s: 1.15 + h * 0.3 });
+        if (h2 < 0.3) add(kpick(KF_BOULDER, h + h2), { x: cx + 0.3, y: 0, z: cz + 0.95, r, s: 0.55 + h * 0.3 });
       }
-      for (const [dx, sx] of [[-1, -0.5], [1, 0.5]]) { const t = m.t[y] && m.t[y][x + dx]; if (t && !(t in WALLS) && t !== 'v' && h2 < 0.7) add('nature/Rock_Medium_' + (1 + ((h * 30) | 0) % 3), { x: cx + sx * 1.05, y: -0.1, z: cz, r, s: 1.3 + h * 0.5 }); }
+      for (const [dx, sx] of [[-1, -0.5], [1, 0.5]]) { const t = m.t[y] && m.t[y][x + dx]; if (t && !(t in WALLS) && t !== 'v' && t !== '~' && h2 < 0.7) add(kpick(KF_SLAB, h + 0.3), { x: cx + sx * 1.05, y: -0.1, z: cz, r, s: 1.3 + h * 0.5 }); }
       if (!front && h < 0.55) add('nature/Pine_' + (1 + ((h * 30) | 0) % 3), { x: cx + (h2 - 0.5) * 0.5, y: CLIFF_H, z: cz, r, s: 1 + h2 * 0.5 });
       else if (h > 0.8) add('nature/Bush_Common_Flowers', { x: cx, y: CLIFF_H, z: cz, r, s: 0.9 });
     }
   }
   const SIZES = { CommonTree: [3.1, 'h'], Pine: [3.0, 'h'], Bush_Common: [1.0, 'w'], Bush_Common_Flowers: [0.95, 'w'], Flower_3_Group: [0.5, 'h'], Flower_4_Group: [0.5, 'h'],
     Grass_Wispy_Tall: [0.75, 'h'], Grass_Common_Tall: [0.7, 'h'], Grass_Common_Short: [0.28, 'h'], Clover_1: [0.35, 'w'], Pebble_Round: [0.25, 'w'], Mushroom_Common: [0.28, 'h'], Mushroom_Laetiporus: [0.45, 'h'],
-    Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.75, 'h'], Barrel_Apples: [0.75, 'h'], Crate_Wooden: [0.6, 'h'], Plant_7: [0.8, 'h'], Pot_1: [0.4, 'h'],
+    Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], Rock_1: [1.0, 'w'], Rock_3: [0.85, 'w'], Bush_1: [1.0, 'w'], Bush_2: [1.1, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.75, 'h'], Barrel_Apples: [0.75, 'h'], Crate_Wooden: [0.6, 'h'], Plant_7: [0.8, 'h'], Pot_1: [0.4, 'h'],
     Bookcase_2: [1.9, 'h'], Table_Large: [1.1, 'w'], Stool: [0.45, 'h'], Bed_Twin1: [1.0, 'w'], Workbench: [1.0, 'w'] };
   const sizeOf = (k) => { const n = k.split('/')[1]; for (const [p, v] of Object.entries(SIZES)) if (n === p || n.startsWith(p + '_') || n.startsWith(p)) return v; return [1, 'h']; };
   if (blossoms.length) {
@@ -468,7 +474,7 @@ function rebuildDynamic(m, st) {
   const prev = lastTiles.get(m.id); const now = m.t.map((r) => r.join(''));
   for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
     const c = m.t[y][x], cx = x + 0.5, cz = y + 0.5, h = hash(x, y);
-    if (c === 'O') { const o = place('nature/Rock_Medium_1', 0.95, 'w'); o.position.set(cx, 0, cz); o.rotation.y = h * TAU; dynGroup.add(o); }
+    if (c === 'O') { const o = place('kf/Rock_3_A', 0.95, 'w'); o.position.set(cx, 0, cz); o.rotation.y = h * TAU; dynGroup.add(o); }
     else if (c === 'B') { const o = place('nature/Bush_Common', 1.1, 'w'); o.position.set(cx, 0, cz); o.rotation.y = h * TAU; dynGroup.add(o); }
     else if (c === 'C' || c === 'c') {
       const o = place('props/Chest_Wood', 0.8, 'w'); o.position.set(cx, 0, cz); dynGroup.add(o);
@@ -627,7 +633,7 @@ function syncMap(dt, S) {
   // boulder slide
   if (cur.moving) {
     const m = cur.moving; let b = dynGroup.userData.slide;
-    if (!b) { b = place('nature/Rock_Medium_1', 0.95, 'w'); dynGroup.add(b); dynGroup.userData.slide = b; }
+    if (!b) { b = place('kf/Rock_3_A', 0.95, 'w'); dynGroup.add(b); dynGroup.userData.slide = b; }
     b.position.set(m.x + (m.tx - m.x) * m.t + 0.5, 0, m.y + (m.ty - m.y) * m.t + 0.5);
   } else if (dynGroup.userData.slide) { dynGroup.userData.slide.removeFromParent(); dynGroup.userData.slide = null; }
   dynGroup.traverse((o) => { if (o.userData.mixer) o.userData.mixer.update(dt / 1000); if (o.userData.spin) { o.rotation.y += dt / 600; o.position.y = 0.25 + Math.sin(T / 300) * 0.08; } });
@@ -741,7 +747,7 @@ function buildArena(kind) {
     tk.forEach((k, j) => instances(arena, k, 3.6, 'h', trees.filter((_, i) => i % tk.length === j).map((t) => ({ ...t, s: 0.85 + R(t.x * 10 | 0, 3) * 0.6 }))));
     instances(arena, 'nature/Bush_Common_Flowers', 1.1, 'w', scatter(16, 20, { w: 26, z0: -7, z1: 1.5, s0: 0.9, s1: 0.6 }));
     instances(arena, 'nature/Bush_Common', 1.1, 'w', scatter(4, 21, { w: 26, z0: -8, z1: -3, s0: 0.9, s1: 0.4 }), { tint: 0xc0e0a0 });
-    instances(arena, 'nature/Rock_Medium_2', 0.9, 'w', scatter(7, 30, { w: 22, z0: -6, z1: 4, s0: 0.7, s1: 0.9 }));
+    KF_BOULDER.forEach((k, j) => instances(arena, k, 0.9, 'w', scatter(3, 30 + j, { w: 22, z0: -6, z1: 4, s0: 0.7, s1: 0.9 })));
     instances(arena, 'nature/Grass_Common_Tall', 0.7, 'h', scatter(140, 40, { w: 24, z0: -8, z1: 5, s0: 0.8, s1: 0.6 }), { cast: false });
     instances(arena, 'nature/Grass_Common_Short', 0.3, 'h', scatter(160, 41, { w: 22, z0: -6, z1: 5, rx: 4.5, rz: 2.2, s0: 0.8, s1: 0.6 }), { cast: false });
     instances(arena, 'nature/Flower_3_Group', 0.5, 'h', scatter(26, 50, { w: 20, z0: -5, z1: 4, s0: 0.9, s1: 0.5 }), { cast: false });

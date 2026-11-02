@@ -68,7 +68,7 @@ python3 -m http.server 8000
 
 ## Credits
 
-- 3D world, buildings and props: [Stylized Nature MegaKit](https://quaternius.itch.io/stylized-nature-megakit) and [Fantasy Props MegaKit](https://quaternius.itch.io/fantasy-props-megakit) by Quaternius, and [KayKit Medieval Hexagon Pack](https://kaylousberg.itch.io/kaykit-medieval-hexagon) by Kay Lousberg (CC0).
+- 3D world, buildings and props: [Stylized Nature MegaKit](https://quaternius.itch.io/stylized-nature-megakit) and [Fantasy Props MegaKit](https://quaternius.itch.io/fantasy-props-megakit) by Quaternius, [KayKit Medieval Hexagon Pack](https://kaylousberg.itch.io/kaykit-medieval-hexagon) and [KayKit Forest Nature Pack](https://kaylousberg.itch.io/kaykit-forest) by Kay Lousberg (CC0).
 - 3D characters: [KayKit Character Pack: Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) by Kay Lousberg (CC0).
 - 3D monsters: [Cute Animated Monsters](https://opengameart.org/content/textured-cute-monster-pack) by Quaternius (CC0).
 - Icons, effects, UI frames, music and jingles: [Ninja Adventure asset pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack) by Pixel-Boy and AAA (CC0).
