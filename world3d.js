@@ -8,6 +8,7 @@ import * as THREE from './lib/three.module.min.js';
 import { GLTFLoader } from './lib/GLTFLoader.js';
 import { MeshoptDecoder } from './lib/meshopt_decoder.module.js';
 import { clone as skClone } from './lib/SkeletonUtils.js';
+import { mergeGeometries, mergeVertices } from './lib/BufferGeometryUtils.js';
 
 const A = 'assets/3d/';
 const FILES = {
@@ -49,7 +50,61 @@ async function load(onProgress) {
   await Promise.all([0, 1, 2, 3, 4, 5].map(worker));
   for (const k of ['chars/Rig_Medium_General', 'chars/Rig_Medium_MovementBasic']) for (const c of G[k].animations) CLIPS[c.name] = c;
   for (const g of Object.values(G)) g.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material && o.material.map) o.material.map.anisotropy = 4; } });
+  for (let i = 0; i < 4; i++) G['gen/FluffyTree_' + i] = { scene: fluffyTree(i), animations: [] };
   setupWind();
+}
+// ------------------------------------------------------------------ fluffy trees, generated in code
+// A bent trunk with a canopy of lumpy leaf clumps: light on top, dark underneath, like a hand-painted storybook tree.
+function leafTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#d8d8d8'; g.fillRect(0, 0, 128, 128);
+  let a = 11; const rnd = () => ((a = (a * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 420; i++) { const v = 170 + rnd() * 85 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.save(); g.translate(rnd() * 128, rnd() * 128); g.rotate(rnd() * 6.28); g.beginPath(); g.ellipse(0, 0, 3 + rnd() * 3, 1.6 + rnd() * 1.4, 0, 0, 6.3); g.fill(); g.restore(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.repeat.set(2, 2); return t;
+}
+let LEAF_TEX = null;
+function fluffyTree(seed) {
+  const R = (k) => hash(seed * 31 + k * 3, k * 7 + seed * 11 + 3);
+  const root = new THREE.Group();
+  // trunk with a gentle bend, plus two short branches
+  const tg = new THREE.CylinderGeometry(0.11, 0.2, 1.7, 7, 4); tg.translate(0, 0.85, 0);
+  const lean = (R(1) - 0.5) * 0.35, tp = tg.attributes.position;
+  for (let i = 0; i < tp.count; i++) { const y = tp.getY(i); tp.setX(i, tp.getX(i) + (y / 1.7) ** 2 * lean); }
+  const parts = [tg];
+  for (let b = 0; b < 2; b++) { const bg = new THREE.CylinderGeometry(0.04, 0.07, 0.7, 5); bg.translate(0, 0.35, 0); bg.rotateZ((b ? 1 : -1) * (0.7 + R(10 + b) * 0.3)); bg.rotateY(R(12 + b) * 6.28); bg.translate(lean * 0.6, 1.15 + b * 0.18, 0); parts.push(bg); }
+  const trunk = new THREE.Mesh(mergeGeometries(parts.map((g) => g.toNonIndexed())), new THREE.MeshStandardMaterial({ color: 0x7a4b2c, roughness: 1, flatShading: true, name: 'Bark_Fluffy' }));
+  // canopy: lumpy clumps around a crown
+  const clumps = [], n = 7 + Math.floor(R(2) * 4), top = 2.25 + R(3) * 0.3;
+  const add = (x, y, z, r) => { const g = new THREE.IcosahedronGeometry(r, 3); g.translate(x, y, z); clumps.push(g); };
+  add(lean, top + 0.35, 0, 0.78 + R(4) * 0.15);
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2 + R(20 + i) * 0.6, d = 0.55 + R(30 + i) * 0.35, y = top - 0.2 + R(40 + i) * 0.55 - (i % 3 === 0 ? 0.3 : 0);
+    add(lean + Math.cos(a) * d, y, Math.sin(a) * d, 0.5 + R(50 + i) * 0.25);
+  }
+  let cg = mergeGeometries(clumps); cg.deleteAttribute('normal'); cg.deleteAttribute('uv'); cg = mergeVertices(cg, 1e-3);
+  // lumpy surface: push each vertex in or out with noise
+  const p = cg.attributes.position, v = new THREE.Vector3(), ctr = new THREE.Vector3(lean, top + 0.1, 0);
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i); const dir = v.clone().sub(ctr).normalize();
+    const nz = vnoise(v.x * 2.6 + seed * 5, v.y * 2.6 + v.z * 1.7) - 0.5;
+    v.addScaledVector(dir, nz * 0.22); p.setXYZ(i, v.x, v.y, v.z);
+  }
+  cg.computeVertexNormals();
+  // light from above, shade underneath, a little hue drift per tree
+  const nm = cg.attributes.normal, col = new Float32Array(p.count * 3), c = new THREE.Color(), dark = new THREE.Color(0x1f4f22), light = new THREE.Color(0x6fb447);
+  cg.computeBoundingBox(); const y0 = cg.boundingBox.min.y, y1 = cg.boundingBox.max.y, hue = (R(5) - 0.5) * 0.06;
+  const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    const t = (p.getY(i) - y0) / (y1 - y0), ny = nm.getY(i);
+    c.copy(dark).lerp(light, Math.min(1, Math.max(0, 0.08 + t * 0.5 + ny * 0.36))); c.offsetHSL(hue, 0, 0);
+    col.set([c.r, c.g, c.b], i * 3);
+    uv[i * 2] = Math.atan2(p.getZ(i) - ctr.z, p.getX(i) - ctr.x) / Math.PI; uv[i * 2 + 1] = p.getY(i) * 0.7;
+  }
+  cg.setAttribute('color', new THREE.BufferAttribute(col, 3)); cg.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  LEAF_TEX = LEAF_TEX || leafTexture();
+  const canopy = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ vertexColors: true, map: LEAF_TEX, roughness: 0.9, name: 'Leaves_Fluffy' }));
+  for (const m of [trunk, canopy]) { m.castShadow = true; m.receiveShadow = true; root.add(m); }
+  return root;
 }
 
 // ------------------------------------------------------------------ templates & instancing
@@ -346,11 +401,11 @@ function buildMap(m, st) {
     const c = m.t[y][x], cx = x + 0.5, cz = y + 0.5, h = hash(x, y), h2 = hash(y + 17, x + 3), r = h2 * TAU;
     if (c === 'T' && y >= m.h - 2) {
       // the bottom edge sits between the camera and the player: low hedges instead of tall trees
-      if (y === m.h - 2 || (x + y) % 2) add(h < 0.6 ? 'kf/Bush_1_A' : 'kf/Bush_2_A', { x: cx + (h2 - 0.5) * 0.3, z: cz, r, s: 1.0 + h * 0.4 });
+      if (y === m.h - 2 || (x + y) % 2) add(h < 0.6 ? 'kf/Bush_1_A' : 'kf/Bush_2_A', { x: cx + (h2 - 0.5) * 0.3, z: cz + 0.2, r, s: 0.62 + h * 0.25 });
     } else if (c === 'T') {
       const deep = [[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => { const t = m.t[y + dy] && m.t[y + dy][x + dx]; return !t || t === 'T'; });
       if (deep && (x + 2 * y) % 3) continue;
-      const k = h < 0.5 ? ['nature/CommonTree_3', 'nature/CommonTree_2', 'nature/CommonTree_4'][((h * 100) | 0) % 3] : 'nature/Pine_' + (1 + ((h * 100) | 0) % 3);
+      const k = h < 0.62 ? 'gen/FluffyTree_' + (((h * 100) | 0) % 4) : 'nature/Pine_' + (1 + ((h * 100) | 0) % 3);
       add(k, { x: cx + (h2 - 0.5) * 0.4, z: cz + (h - 0.5) * 0.4, r, s: (deep ? 1.6 : 1) * (0.85 + h2 * 0.3) });
     } else if (c === 't') add('nature/Bush_Common_Flowers', { x: cx, z: cz, r, s: 1.0 + h * 0.3 });
     else if (c === 'b') { add('nature/Flower_3_Group', { x: cx - 0.2, z: cz, r, s: 1.1 }); add('nature/Flower_4_Group', { x: cx + 0.2, z: cz + 0.15, r, s: 1.1 }); add('nature/Grass_Common_Short', { x: cx, z: cz - 0.2, r, s: 1 }); }
@@ -418,7 +473,7 @@ function buildMap(m, st) {
       else if (h > 0.8) add('nature/Bush_Common_Flowers', { x: cx, y: CLIFF_H, z: cz, r, s: 0.9 });
     }
   }
-  const SIZES = { CommonTree: [3.1, 'h'], Pine: [3.0, 'h'], Bush_Common: [1.0, 'w'], Bush_Common_Flowers: [0.95, 'w'], Flower_3_Group: [0.5, 'h'], Flower_4_Group: [0.5, 'h'],
+  const SIZES = { FluffyTree: [3.2, 'h'], CommonTree: [3.1, 'h'], Pine: [3.0, 'h'], Bush_Common: [1.0, 'w'], Bush_Common_Flowers: [0.95, 'w'], Flower_3_Group: [0.5, 'h'], Flower_4_Group: [0.5, 'h'],
     Grass_Wispy_Tall: [0.75, 'h'], Grass_Common_Tall: [0.7, 'h'], Grass_Common_Short: [0.28, 'h'], Clover_1: [0.35, 'w'], Pebble_Round: [0.25, 'w'], Mushroom_Common: [0.28, 'h'], Mushroom_Laetiporus: [0.45, 'h'],
     Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], Rock_1: [1.0, 'w'], Rock_3: [0.85, 'w'], Bush_1: [1.0, 'w'], Bush_2: [1.1, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.75, 'h'], Barrel_Apples: [0.75, 'h'], Crate_Wooden: [0.6, 'h'], Plant_7: [0.8, 'h'], Pot_1: [0.4, 'h'],
     Bookcase_2: [1.9, 'h'], Table_Large: [1.1, 'w'], Stool: [0.45, 'h'], Bed_Twin1: [1.0, 'w'], Workbench: [1.0, 'w'] };
@@ -743,7 +798,7 @@ function buildArena(kind) {
   if (field) {
     // a sunny forest clearing
     const trees = scatter(46, 10, { w: 40, z0: -19, z1: -6, rx: 1, rz: 1 }).concat(scatter(10, 11, { w: 30, z0: -6, z1: 2, rx: 9.5, rz: 9 }));
-    const tk = ['nature/CommonTree_1', 'nature/CommonTree_2', 'nature/CommonTree_3', 'nature/CommonTree_4', 'nature/CommonTree_5', 'nature/Pine_1', 'nature/Pine_2', 'nature/Pine_3'];
+    const tk = ['gen/FluffyTree_0', 'gen/FluffyTree_1', 'gen/FluffyTree_2', 'gen/FluffyTree_3', 'gen/FluffyTree_0', 'nature/Pine_1', 'nature/Pine_2', 'gen/FluffyTree_2'];
     tk.forEach((k, j) => instances(arena, k, 3.6, 'h', trees.filter((_, i) => i % tk.length === j).map((t) => ({ ...t, s: 0.85 + R(t.x * 10 | 0, 3) * 0.6 }))));
     instances(arena, 'nature/Bush_Common_Flowers', 1.1, 'w', scatter(16, 20, { w: 26, z0: -7, z1: 1.5, s0: 0.9, s1: 0.6 }));
     instances(arena, 'nature/Bush_Common', 1.1, 'w', scatter(4, 21, { w: 26, z0: -8, z1: -3, s0: 0.9, s1: 0.4 }), { tint: 0xc0e0a0 });
@@ -931,7 +986,7 @@ function addWind(mat, k) {
   };
   mat.customProgramCacheKey = () => 'wind' + k;
 }
-const WIND = [[/^nature\/(CommonTree|Pine|TwistedTree|DeadTree)/, 0.035], [/^nature\/Bush/, 0.06], [/^nature\/(Grass|Flower|Fern|Clover|Plant)/, 0.22]];
+const WIND = [[/^gen\/FluffyTree/, 0.03], [/^nature\/(CommonTree|Pine|TwistedTree|DeadTree)/, 0.035], [/^nature\/Bush/, 0.06], [/^nature\/(Grass|Flower|Fern|Clover|Plant)/, 0.22]];
 function setupWind() {
   for (const [key, g] of Object.entries(G)) {
     const w = WIND.find(([re]) => re.test(key)); if (!w) continue;
