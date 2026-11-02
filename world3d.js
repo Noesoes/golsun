@@ -17,7 +17,7 @@ const FILES = {
   props: ['Chest_Wood', 'Bed_Twin1', 'Bookcase_2', 'Table_Large', 'Chair_1', 'Stool', 'Barrel', 'Barrel_Apples', 'Lantern_Wall', 'Anvil', 'Cauldron', 'Workbench',
     'Potion_1', 'Shelf_Simple', 'Crate_Wooden', 'FarmCrate_Apple', 'CandleStick_Stand', 'Bench', 'Vase_2', 'Pot_1'],
   bld: ['home_A_red', 'home_B_yellow', 'tavern_blue', 'market_green', 'blacksmith_red', 'well_blue', 'windmill_yellow', 'fence_wood_straight', 'waterlily_A', 'waterlily_B', 'sack', 'resource_lumber'],
-  mon: ['Slime', 'Rat', 'Wasp', 'Snake', 'Frog', 'Spider', 'Bat', 'Skeleton', 'Dragon'],
+  cute: ['Alien_Tall', 'Cactus', 'Bee', 'Pig', 'Mushroom', 'Cyclops', 'Bat', 'Ghost', 'YellowDragon'],
   chars: ['Ranger', 'Barbarian', 'Mage', 'Knight', 'Rogue', 'Rogue_Hooded', 'Rig_Medium_General', 'Rig_Medium_MovementBasic'],
 };
 const G = {};
@@ -531,15 +531,15 @@ function actor(id, who) {
   return a;
 }
 function monsterObj(shape, height) {
-  const src = G['mon/' + shape].scene, obj = skClone(src), wrap = new THREE.Group(), inner = new THREE.Group();
+  const src = G['cute/' + shape].scene, obj = skClone(src), wrap = new THREE.Group(), inner = new THREE.Group();
   inner.add(obj); wrap.add(inner); obj.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(obj), sz = b.getSize(new THREE.Vector3());
   const s = height / Math.max(sz.y, Math.max(sz.x, sz.z) * 0.55); obj.scale.multiplyScalar(s);
   obj.position.set(-(b.min.x + b.max.x) / 2 * s, -b.min.y * s, -(b.min.z + b.max.z) / 2 * s);
   obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; o.material = o.material.clone(); o.userData.baseEm = o.material.emissive ? o.material.emissive.clone() : null; } });
-  const mixer = new THREE.AnimationMixer(obj), anims = G['mon/' + shape].animations, actions = {};
+  const mixer = new THREE.AnimationMixer(obj), anims = G['cute/' + shape].animations, actions = {};
   const find = (k) => anims.find((c) => c.name.toLowerCase().includes(k));
-  for (const [k, n] of [['idle', 'idle'], ['fly', 'flying'], ['attack', 'attack'], ['death', 'death'], ['hit', 'hit'], ['walk', 'walk']]) { const c = find(n); if (c) actions[k] = mixer.clipAction(c); }
+  for (const [k, n] of [['idle', 'idle'], ['fly', 'flying'], ['attack', 'bite_front'], ['death', 'death'], ['hit', 'hit'], ['walk', 'walk']]) { const c = find(n) || (k === 'attack' && find('bite')); if (c) actions[k] = mixer.clipAction(c); }
   const idle = actions.idle || actions.fly || actions.walk; if (idle) idle.play();
   for (const k of ['attack', 'death', 'hit']) if (actions[k]) { actions[k].setLoop(THREE.LoopOnce); actions[k].clampWhenFinished = true; }
   return { obj: wrap, inner, mixer, actions, cur: 'idle', idle };
@@ -583,7 +583,7 @@ function syncMap(dt, S) {
     const x = n.fx + (n.x - n.fx) * n.t + 0.5, z = n.fy + (n.y - n.fy) * n.t + 0.5;
     if (n.enemy) {
       let a = actors.get(id);
-      if (!a) { const mo = monsterObj(ENEMY_MODEL[ENEMIES[n.enemy].shape] || 'Dragon', 2.4); a = { obj: mo.obj, mixer: mo.mixer, mon: mo }; actors.set(id, a); scene.add(a.obj); tintMonster(mo, ENEMIES[n.enemy].shape); }
+      if (!a) { const mo = monsterObj(ENEMY_MODEL[ENEMIES[n.enemy].shape] || 'YellowDragon', 2.4); a = { obj: mo.obj, mixer: mo.mixer, mon: mo }; actors.set(id, a); scene.add(a.obj); tintMonster(mo, ENEMIES[n.enemy].shape); }
       a.obj.position.set(x, 0.2 + Math.sin(T / 500) * 0.15, z); a.obj.rotation.y = 0;
       continue;
     }
@@ -640,9 +640,9 @@ bSun.position.set(-3, 10, 9); bSun.castShadow = true; bSun.shadow.mapSize.set(10
 battleScene.add(bHemi, bSun, bGlow);
 let arena = null, arenaKind = '', bModels = [];
 const b3 = new WeakMap(); // battle participant -> 3D model (kept out of the save state)
-const ENEMY_MODEL = { slime: 'Slime', squirrel: 'Rat', wasp: 'Wasp', worm: 'Snake', mushroom: 'Frog', turtle: 'Spider', moth: 'Bat', ghost: 'Skeleton', wraith: 'Dragon' };
-const ENEMY_H = { Slime: 0.75, Rat: 0.9, Wasp: 0.85, Snake: 1.25, Frog: 0.95, Spider: 0.95, Bat: 1.3, Skeleton: 1.7, Dragon: 2.6 };
-const ENEMY_TINT = { wraith: 0x9a7ad8, ghost: 0xd8d0ff, moth: 0xc8b0ff };
+const ENEMY_MODEL = { slime: 'Alien_Tall', squirrel: 'Cactus', wasp: 'Bee', worm: 'Pig', mushroom: 'Mushroom', turtle: 'Cyclops', moth: 'Bat', ghost: 'Ghost', wraith: 'YellowDragon' };
+const ENEMY_H = { Alien_Tall: 0.95, Cactus: 1.0, Bee: 0.85, Pig: 0.95, Mushroom: 1.0, Cyclops: 1.35, Bat: 0.9, Ghost: 1.1, YellowDragon: 2.1 };
+const ENEMY_TINT = { wraith: 0xb090f0, ghost: 0xe0dcff };
 const ENEMY_GLOW = { wraith: 0x3a2a5a, ghost: 0x2a2440, moth: 0x2a2040 };
 function tintMonster(mo, shape) { const t = ENEMY_TINT[shape], g = ENEMY_GLOW[shape]; mo.obj.traverse((o) => { if (!o.isMesh) return; if (t) o.material.color.multiply(new THREE.Color(t)); if (g && o.material.emissive) { o.material.emissive.set(g); o.userData.baseEm = o.material.emissive.clone(); } }); }
 function buildArena(kind) {
@@ -696,7 +696,7 @@ function battleStart(B, party, heroPos) {
     const model = ENEMY_MODEL[e.d.shape] || 'Slime', hgt = ENEMY_H[model] * (e.d.boss ? 1 : 1);
     const mo = monsterObj(model, hgt); tintMonster(mo, e.d.shape);
     const p = screenToGround(battleCam, e.x, e.y); mo.obj.position.copy(p); mo.home = p.clone();
-    mo.obj.rotation.y = Math.PI / 2 - 0.35;
+    mo.obj.rotation.y = 0.6; // mostly toward the camera, turned a little toward the heroes
     battleScene.add(mo.obj); b3.set(e, mo); bModels.push(mo);
     // screen-space size for the 2D effects layer
     const top = project(battleCam, p.x, hgt, p.z), bot = project(battleCam, p.x, 0, p.z);

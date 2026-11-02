@@ -6,7 +6,8 @@ Rebuild with: python3 tools/build_assets.py "/path/to/Ninja Adventure - Asset Pa
 3D models (assets/3d), all released under CC0. Textures were compressed to WebP with gltf-transform:
   - Stylized Nature MegaKit by Quaternius: https://quaternius.itch.io/stylized-nature-megakit
   - Fantasy Props MegaKit by Quaternius: https://quaternius.itch.io/fantasy-props-megakit
-  - Easy Enemies and LowPoly Animated Monsters by Quaternius: https://quaternius.com
+  - Cute Animated Monsters (Textured Cute Monster Pack) by Quaternius: https://opengameart.org/content/textured-cute-monster-pack
+    (FBX converted with FBX2glTF, textures attached and resized)
   - KayKit Character Pack: Adventurers by Kay Lousberg: https://kaylousberg.itch.io/kaykit-adventurers
   - KayKit Medieval Hexagon Pack by Kay Lousberg: https://kaylousberg.itch.io/kaykit-medieval-hexagon
 Rebuild with: tools/build_3d.sh
