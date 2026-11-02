@@ -704,8 +704,18 @@ function syncMap(dt, S) {
   const goal = new THREE.Vector3(cx, 0, cz);
   if (!camInit) { camTarget.copy(goal); camInit = true; } else camTarget.lerp(goal, Math.min(1, dt / 55));
   const dist = interior ? 9.5 : 13.5;
-  camera.position.set(camTarget.x, camTarget.y + dist * 0.87, camTarget.z + dist * 0.5);
-  camera.lookAt(camTarget.x, 0, camTarget.z - 0.6);
+  if (W3D.cam3p) {
+    // experimental third-person view: low, behind the hero's shoulder, looking where they face
+    const yaw = W3D.cam3p.yaw != null ? W3D.cam3p.yaw : DIR_ROT[P.dir], back = W3D.cam3p.dist || 3.4, up = W3D.cam3p.height || 1.9;
+    camera.fov = 55; camera.updateProjectionMatrix();
+    camera.position.set(px - Math.sin(yaw) * back + Math.cos(yaw) * 0.6, up, pz - Math.cos(yaw) * back - Math.sin(yaw) * 0.6);
+    camera.lookAt(px + Math.sin(yaw) * 4, 0.9, pz + Math.cos(yaw) * 4);
+    if (scene.fog) { scene.fog.near = 14; scene.fog.far = 38; }
+  } else {
+    if (camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); }
+    camera.position.set(camTarget.x, camTarget.y + dist * 0.87, camTarget.z + dist * 0.5);
+    camera.lookAt(camTarget.x, 0, camTarget.z - 0.6);
+  }
   sun.position.set(camTarget.x - 6, 14, camTarget.z + 5); sun.target.position.copy(camTarget);
   // lights in caves / interiors
   playerLight.position.set(px, 3.2, pz + 1.6);
