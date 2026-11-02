@@ -78,7 +78,7 @@ function instances(parent, key, size, mode, items, opt = {}) {
     if (opt.emissive) { mat = mat.clone(); mat.emissive = new THREE.Color(opt.emissive); mat.emissiveIntensity = opt.ei || 0.6; }
     const im = new THREE.InstancedMesh(m.geometry, mat, items.length);
     items.forEach((it, i) => {
-      _e.set(0, it.r || 0, 0); _q.setFromEuler(_e); _s.setScalar(it.s || 1); _p.set(it.x, it.y || 0, it.z);
+      _e.set(0, it.r || 0, 0); _q.setFromEuler(_e); _s.setScalar(it.s || 1); if (it.sy) _s.y *= it.sy; _p.set(it.x, it.y || 0, it.z);
       _m.compose(_p, _q, _s).multiply(m.matrixWorld); im.setMatrixAt(i, _m);
     });
     im.castShadow = opt.cast !== false; im.receiveShadow = true;
@@ -645,41 +645,121 @@ const ENEMY_H = { Alien_Tall: 0.95, Cactus: 1.0, Bee: 0.85, Pig: 0.95, Mushroom:
 const ENEMY_TINT = { wraith: 0xb090f0, ghost: 0xe0dcff };
 const ENEMY_GLOW = { wraith: 0x3a2a5a, ghost: 0x2a2440, moth: 0x2a2040 };
 function tintMonster(mo, shape) { const t = ENEMY_TINT[shape], g = ENEMY_GLOW[shape]; mo.obj.traverse((o) => { if (!o.isMesh) return; if (t) o.material.color.multiply(new THREE.Color(t)); if (g && o.material.emissive) { o.material.emissive.set(g); o.userData.baseEm = o.material.emissive.clone(); } }); }
+// ------------------------------------------------------------------ battle arenas
+// smooth value noise for terrain colour and height
+function vnoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), fx = x - xi, fz = z - zi, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+  const a = hash(xi, zi), b = hash(xi + 1, zi), c = hash(xi, zi + 1), d = hash(xi + 1, zi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+const fbm = (x, z) => vnoise(x, z) * 0.6 + vnoise(x * 2.3 + 7, z * 2.3 + 3) * 0.3 + vnoise(x * 5.1, z * 5.1) * 0.1;
+const arenaLights = [0, 1, 2].map(() => new THREE.PointLight(0x7af0ff, 0, 9, 1.6));
+battleScene.add(...arenaLights);
+let motes = null;
+function arenaGround(kind) {
+  const W = 46, D = 34, g = new THREE.PlaneGeometry(W, D, 92, 68); g.rotateX(-Math.PI / 2); g.translate(0.6, 0, -6);
+  const pos = g.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color();
+  const field = kind === 'field';
+  const A = field ? [new THREE.Color(0x5c9a3c), new THREE.Color(0x7cbc50), new THREE.Color(0x4a7e30)] : kind === 'boss' ? [new THREE.Color(0x3a3150), new THREE.Color(0x4c4266), new THREE.Color(0x2a2238)] : [new THREE.Color(0x4a3e44), new THREE.Color(0x5e5258), new THREE.Color(0x342a30)];
+  const dirt = field ? new THREE.Color(0xa88a58) : new THREE.Color(kind === 'boss' ? 0x5a5070 : 0x6a5a58);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const n = fbm(x * 0.35, z * 0.35), n2 = vnoise(x * 0.9 + 40, z * 0.9);
+    c.copy(A[0]).lerp(A[1], n).lerp(A[2], Math.max(0, n2 - 0.6) * 1.6);
+    // the worn clearing where the battle happens
+    const e = Math.hypot((x - 0.4) / 6.2, (z - 0.9) / 3.2) + (n - 0.5) * 0.5;
+    c.lerp(dirt, Math.max(0, Math.min(1, (1.05 - e) * 2.2)) * (field ? 0.85 : 0.5));
+    col.set([c.r, c.g, c.b], i * 3);
+    const away = Math.max(0, Math.min(1, (Math.hypot((x - 0.4) / 7.5, (z - 0.9) / 4) - 1.15) * 0.8));
+    pos.setY(i, (fbm(x * 0.18 + 9, z * 0.18) - 0.35) * 2.4 * away * (field ? 1 : 1.4));
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+  const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / 3, pos.getZ(i) / 3);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: TEX.ground, roughness: 1 }));
+  m.receiveShadow = true; m.userData.own = true; return m;
+}
+function skyTexture(top, bottom) {
+  const c = document.createElement('canvas'); c.width = 2; c.height = 256; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, top); gr.addColorStop(1, bottom); g.fillStyle = gr; g.fillRect(0, 0, 2, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function arenaMotes(color, n, size) {
+  const g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), sp = new Float32Array(n);
+  for (let i = 0; i < n; i++) { p.set([(hash(i, 1) - 0.5) * 18 + 0.6, hash(i, 2) * 5, (hash(i, 3) - 0.5) * 12 - 2], i * 3); sp[i] = 0.2 + hash(i, 4) * 0.5; }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.userData.speed = sp;
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color, size, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+  pts.userData.own = true; pts.frustumCulled = false; return pts;
+}
 function buildArena(kind) {
   if (arena && arenaKind === kind) return;
   dispose(arena); arena = new THREE.Group(); battleScene.add(arena); arenaKind = kind;
-  const field = kind === 'field';
-  const gm = new THREE.MeshStandardMaterial({ color: field ? 0x6fb04c : kind === 'boss' ? 0x3a3248 : 0x5a4e46, map: TEX.ground, roughness: 1 });
-  const gnd = new THREE.Mesh(new THREE.CircleGeometry(30, 48), gm); gnd.rotation.x = -Math.PI / 2; gnd.receiveShadow = true; gnd.userData.own = true; arena.add(gnd);
-  const trees = [], rocks = [], grass = [], flowers = [];
-  for (let i = 0; i < 70; i++) {
-    const a = hash(i, 3) * TAU, r = 7 + hash(i, 9) * 9, x = Math.cos(a) * r, z = Math.sin(a) * r - 5;
-    if (z > 3) continue;
-    (field ? trees : rocks).push({ x, z, r: hash(i, 5) * TAU, s: 0.9 + hash(i, 7) * 0.6 });
-  }
-  for (let i = 0; i < 160; i++) { const x = (hash(i, 11) - 0.5) * 22, z = (hash(i, 13) - 0.5) * 16 - 1; (i % 9 === 0 ? flowers : grass).push({ x, z, r: hash(i, 2) * TAU, s: 0.8 + hash(i, 4) * 0.6 }); }
+  const field = kind === 'field', R = (i, k) => hash(i * 7 + k, k * 13 + 5);
+  arena.add(arenaGround(kind));
+  const heightAt = (x, z) => { const away = Math.max(0, Math.min(1, (Math.hypot((x - 0.4) / 7.5, (z - 0.9) / 4) - 1.15) * 0.8)); return (fbm(x * 0.18 + 9, z * 0.18) - 0.35) * 2.4 * away * (field ? 1 : 1.4); };
+  // scatter helper: n items in a band behind / beside the fight, never on the clearing
+  const scatter = (n, seed, opts) => {
+    const out = [];
+    for (let i = 0; out.length < n && i < n * 8; i++) {
+      const x = (R(i, seed) - 0.5) * (opts.w || 30) + 0.6, z = opts.z0 + R(i, seed + 1) * (opts.z1 - opts.z0);
+      const e = Math.hypot((x - 0.4) / (opts.rx || 6.8), (z - 0.9) / (opts.rz || 3.6));
+      if (e < 1 || (opts.front === false && z > 2.5)) continue;
+      out.push({ x, y: heightAt(x, z) + (opts.y || 0), z, r: R(i, seed + 2) * TAU, s: (opts.s0 || 1) + R(i, seed + 3) * (opts.s1 || 0), sy: opts.sy ? opts.sy + R(i, seed + 4) * opts.sy : undefined });
+    }
+    return out;
+  };
+  arenaLights.forEach((l) => (l.intensity = 0));
+  if (motes) { motes.removeFromParent(); motes = null; }
   if (field) {
-    const tk = ['nature/CommonTree_1', 'nature/CommonTree_2', 'nature/CommonTree_3', 'nature/Pine_2'];
-    tk.forEach((k, j) => instances(arena, k, 3.4, 'h', trees.filter((_, i) => i % tk.length === j)));
-    instances(arena, 'nature/Grass_Common_Short', 0.3, 'h', grass, { cast: false });
-    instances(arena, 'nature/Flower_4_Group', 0.5, 'h', flowers, { cast: false });
-    instances(arena, 'nature/Bush_Common_Flowers', 1.0, 'w', [{ x: -5.5, z: 1 }, { x: 6, z: 2.4 }, { x: -2, z: -4.5 }], {});
-    battleScene.background = new THREE.Color(0x9cc8e8); battleScene.fog = new THREE.Fog(0x9cc8e8, 18, 40);
-    bHemi.color.set(0xd8ecff); bHemi.groundColor.set(0x5a6a3a); bHemi.intensity = 1.2; bSun.color.set(0xfff0d8); bSun.intensity = 2.4; bGlow.intensity = 0;
+    // a sunny forest clearing
+    const trees = scatter(46, 10, { w: 40, z0: -19, z1: -6, rx: 1, rz: 1 }).concat(scatter(10, 11, { w: 30, z0: -6, z1: 2, rx: 9.5, rz: 9 }));
+    const tk = ['nature/CommonTree_1', 'nature/CommonTree_2', 'nature/CommonTree_3', 'nature/CommonTree_4', 'nature/CommonTree_5', 'nature/Pine_1', 'nature/Pine_2', 'nature/Pine_3'];
+    tk.forEach((k, j) => instances(arena, k, 3.6, 'h', trees.filter((_, i) => i % tk.length === j).map((t) => ({ ...t, s: 0.85 + R(t.x * 10 | 0, 3) * 0.6 }))));
+    instances(arena, 'nature/Bush_Common_Flowers', 1.1, 'w', scatter(16, 20, { w: 26, z0: -7, z1: 1.5, s0: 0.9, s1: 0.6 }));
+    instances(arena, 'nature/Bush_Common', 1.1, 'w', scatter(4, 21, { w: 26, z0: -8, z1: -3, s0: 0.9, s1: 0.4 }), { tint: 0xc0e0a0 });
+    instances(arena, 'nature/Rock_Medium_2', 0.9, 'w', scatter(7, 30, { w: 22, z0: -6, z1: 4, s0: 0.7, s1: 0.9 }));
+    instances(arena, 'nature/Grass_Common_Tall', 0.7, 'h', scatter(140, 40, { w: 24, z0: -8, z1: 5, s0: 0.8, s1: 0.6 }), { cast: false });
+    instances(arena, 'nature/Grass_Common_Short', 0.3, 'h', scatter(160, 41, { w: 22, z0: -6, z1: 5, rx: 4.5, rz: 2.2, s0: 0.8, s1: 0.6 }), { cast: false });
+    instances(arena, 'nature/Flower_3_Group', 0.5, 'h', scatter(26, 50, { w: 20, z0: -5, z1: 4, s0: 0.9, s1: 0.5 }), { cast: false });
+    instances(arena, 'nature/Flower_4_Group', 0.5, 'h', scatter(26, 51, { w: 20, z0: -5, z1: 4, s0: 0.9, s1: 0.5 }), { cast: false });
+    instances(arena, 'nature/Fern_1', 0.6, 'w', scatter(18, 60, { w: 24, z0: -7, z1: 3, s0: 0.9, s1: 0.6 }), { cast: false });
+    instances(arena, 'nature/Clover_1', 0.35, 'w', scatter(30, 61, { w: 18, z0: -4, z1: 5, rx: 5, rz: 2.6 }), { cast: false });
+    instances(arena, 'nature/Mushroom_Common', 0.28, 'h', scatter(10, 62, { w: 18, z0: -5, z1: 3 }), { cast: false });
+    instances(arena, 'bld/fence_wood_straight', 1.0, 'd', [-8.6, -7.6, -6.6, -5.6].map((x, i) => ({ x, y: heightAt(x, -5.2), z: -5.2 - i * 0.05, r: Math.PI / 2 })));
+    battleScene.background = skyTexture('#6fa6dc', '#cfe7f0'); battleScene.fog = new THREE.Fog(0xbcdcea, 16, 36);
+    bHemi.color.set(0xd6ecff); bHemi.groundColor.set(0x4a6a30); bHemi.intensity = 1.15; bSun.color.set(0xfff0d0); bSun.intensity = 2.7; bSun.position.set(-6, 10, 5); bGlow.intensity = 0;
+    motes = arenaMotes(0xfff6c0, 60, 0.07);
   } else {
-    instances(arena, 'nature/Rock_Medium_1', 2.4, 'w', rocks.filter((_, i) => i % 2), { tint: 0x8a80a0 });
-    instances(arena, 'nature/Rock_Medium_3', 2.0, 'w', rocks.filter((_, i) => !(i % 2)), { tint: 0x8a80a0 });
-    for (let i = 0; i < 6; i++) { const c = crystal(); c.position.set(-7 + i * 2.8, 0, -6 - hash(i, 1) * 3); c.scale.setScalar(1.6); arena.add(c); }
-    battleScene.background = new THREE.Color(0x0a0812); battleScene.fog = new THREE.Fog(0x0a0812, 10, 24);
-    bHemi.color.set(0xb0a8e8); bHemi.groundColor.set(0x3a3048); bHemi.intensity = 1.5; bSun.intensity = 1.8; bSun.color.set(0xd8d0ff);
-    bGlow.color.set(0x6af0ff); bGlow.position.set(-2, 3, -3); bGlow.intensity = 10;
-    if (kind === 'boss') {
+    // a crystal cavern: rock walls, stalagmites, glowing crystals, mushrooms and pools
+    const boss = kind === 'boss';
+    const wall = []; for (let i = 0; i < 34; i++) { const x = -17 + i + (R(i, 70) - 0.5) * 0.8, z = -8.5 - R(i, 71) * 2.5; wall.push({ x, y: heightAt(x, z) - 0.6, z, r: R(i, 72) * TAU, s: 3 + R(i, 73) * 2.2, sy: 1.3 + R(i, 74) * 0.8 }); }
+    for (let i = 0; i < 14; i++) { const side = i % 2 ? 1 : -1, x = side * (10.5 + R(i, 75) * 3) + 0.6, z = -7 + (i >> 1) * 1.6; wall.push({ x, y: -0.5, z, r: R(i, 76) * TAU, s: 2.6 + R(i, 77) * 2, sy: 1.2 + R(i, 78) }); }
+    instances(arena, 'nature/Rock_Medium_1', 1, 'w', wall.filter((_, i) => i % 3 === 0), { tint: 0x6a6080 });
+    instances(arena, 'nature/Rock_Medium_2', 1, 'w', wall.filter((_, i) => i % 3 === 1), { tint: 0x5e5674 });
+    instances(arena, 'nature/Rock_Medium_3', 1, 'w', wall.filter((_, i) => i % 3 === 2), { tint: 0x726a88 });
+    instances(arena, 'nature/Rock_Medium_3', 0.8, 'w', scatter(14, 80, { w: 24, z0: -7, z1: 3, s0: 0.8, s1: 0.7, sy: 1.4 }), { tint: 0x7a7090 }); // stalagmites
+    instances(arena, 'nature/Pebble_Round_1', 0.25, 'w', scatter(40, 81, { w: 20, z0: -6, z1: 5, rx: 4, rz: 2 }), { tint: 0x8a80a0, cast: false });
+    instances(arena, 'nature/Mushroom_Laetiporus', 0.5, 'h', scatter(9, 82, { w: 22, z0: -6, z1: 2 }), { emissive: 0x8a3ad8, ei: 0.9, cast: false });
+    instances(arena, 'nature/Mushroom_Common', 0.3, 'h', scatter(14, 83, { w: 22, z0: -6, z1: 3 }), { emissive: 0x3a8ad8, ei: 0.7, cast: false });
+    const spots = [[-7.5, -6.2], [-3, -7.4], [4.2, -7], [8.3, -5.2], [-9.6, -2.2]];
+    spots.forEach(([x, z], i) => { const c = crystal(); c.position.set(x, heightAt(x, z), z); c.scale.setScalar(1.1 + R(i, 90) * 0.5); c.rotation.y = R(i, 91) * TAU; arena.add(c); });
+    arenaLights.forEach((l, i) => { const [x, z] = spots[i * 2 % spots.length]; l.position.set(x, 1.6, z + 0.6); l.color.set(i === 1 ? 0xb07aff : 0x6af0ff); l.intensity = boss ? 8 : 6; l.distance = 10; });
+    for (const [x, z, r] of [[-5.2, 3.2, 1.1], [6.4, -3.6, 0.9], [-1.5, -5.4, 0.8]]) {
+      if (boss && x < 0 && z < 0) continue;
+      const p = new THREE.Mesh(new THREE.CircleGeometry(r, 24), new THREE.MeshStandardMaterial({ color: 0x1a3a5a, emissive: 0x0a5a7a, emissiveIntensity: 0.6, roughness: 0.05, metalness: 0.3 }));
+      p.rotation.x = -Math.PI / 2; p.position.set(x, heightAt(x, z) + 0.03, z); p.userData.own = true; arena.add(p);
+    }
+    battleScene.background = skyTexture('#05030a', boss ? '#1a1030' : '#141020'); battleScene.fog = new THREE.Fog(boss ? 0x140c26 : 0x0e0a16, 12, 26);
+    bHemi.color.set(0xb0a8e8); bHemi.groundColor.set(0x2a2038); bHemi.intensity = 1.25; bSun.intensity = 1.5; bSun.color.set(0xd0c8ff); bSun.position.set(-3, 10, 9);
+    bGlow.color.set(0x6af0ff); bGlow.position.set(-2, 3, -3); bGlow.intensity = 6;
+    motes = arenaMotes(boss ? 0xa8fff0 : 0x9ad8ff, boss ? 90 : 60, 0.06);
+    if (boss) {
       const ring = new THREE.Group();
-      for (let i = 0; i < 16; i++) { const s = place('nature/Pebble_Round_' + (i % 2 ? 1 : 3), 0.6, 'w'); s.position.set(Math.cos(i / 16 * TAU) * 1.9, 0, Math.sin(i / 16 * TAU) * 1.9); ring.add(s); }
-      const pool = new THREE.Mesh(new THREE.CircleGeometry(1.8, 32), new THREE.MeshStandardMaterial({ color: 0x5af0e0, emissive: 0x1aa890, emissiveIntensity: 1.1 })); pool.rotation.x = -Math.PI / 2; pool.position.y = 0.04; pool.userData.own = true; ring.add(pool);
-      ring.position.set(-2.4, 0, -1.6); arena.add(ring); bGlow.color.set(0x8affe8); bGlow.position.set(-2.4, 2, -1); bGlow.intensity = 16;
+      for (let i = 0; i < 18; i++) { const s = place('nature/Pebble_Round_' + (i % 2 ? 1 : 3), 0.6, 'w'); s.position.set(Math.cos(i / 18 * TAU) * 2.1, 0, Math.sin(i / 18 * TAU) * 2.1); s.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.multiply(new THREE.Color(0xa098c0)); } }); ring.add(s); }
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(2, 40), new THREE.MeshStandardMaterial({ color: 0x5af0e0, emissive: 0x1aa890, emissiveIntensity: 1.0, roughness: 0.1 })); pool.rotation.x = -Math.PI / 2; pool.position.y = 0.04; pool.userData.own = true; ring.add(pool);
+      ring.position.set(-2.4, 0, -1.6); arena.add(ring); bGlow.color.set(0x8affe8); bGlow.position.set(-2.4, 2, -1); bGlow.intensity = 14;
     }
   }
+  if (motes) battleScene.add(motes);
 }
 const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 function screenToGround(cam, sx, sy, out = new THREE.Vector3()) {
@@ -714,6 +794,11 @@ function battleStart(B, party, heroPos) {
   return { heroH: b.y - t.y };
 }
 function battleSync(dt, B, party, T) {
+  if (motes) {
+    const p = motes.geometry.attributes.position, sp = motes.geometry.userData.speed;
+    for (let i = 0; i < sp.length; i++) { let y = p.getY(i) + sp[i] * dt / 1000 * 0.6; if (y > 5) y = 0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(T / 900 + i) * 0.002); }
+    p.needsUpdate = true; motes.material.opacity = 0.55 + Math.sin(T / 400) * 0.25;
+  }
   for (const e of B.enemies) {
     const mo = b3.get(e); if (!mo) continue;
     const ox = (e.shake > 0 ? Math.sin(T / 14) * 0.06 : 0) + (e.lunge > 0 ? Math.sin((e.lunge / 300) * Math.PI) * 0.7 : 0);
