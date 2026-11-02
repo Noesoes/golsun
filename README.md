@@ -30,7 +30,7 @@ Together they travel through Windmere Fields and into Whisper Grotto to find out
 | Touch       | Keyboard          | Action                                       |
 |-------------|-------------------|----------------------------------------------|
 | Tap screen  | –                 | Walk somewhere; tap people or things to interact |
-| Arrow pad   | Arrows / WASD    | Walk (relative to the camera), choose menu options |
+| Arrow pad   | Arrows / WASD    | Up runs forward, left/right turn, down turns around; choose menu options |
 | Swipe screen | –               | Turn the camera |
 | **A**       | Z / Enter / Space | Talk, open, use a tool, confirm              |
 | **B**       | X / Esc / Shift   | Back; hold to walk (or to run, if Always run is off in Settings) |

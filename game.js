@@ -201,7 +201,7 @@ window.addEventListener('blur', () => { for (const k in held) release(k); });
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x; drag.x = e.clientX;
     if (Math.abs(e.clientX - drag.x0) > 8) drag.moved = true;
-    if (drag.moved) W3D.setCamYaw(W3D.getCamYaw() - dx * 0.011);
+    if (drag.moved) { P.camOff = (P.camOff || 0) - dx * 0.011; W3D.setCamYaw(W3D.getCamYaw() - dx * 0.011); }
   });
   const dragEnd = (e) => { if (!drag || e.pointerId !== drag.id) return; const d = drag; drag = null; if (!d.moved && e.type === 'pointerup') tap(...toLogical(e)); };
   cvs.addEventListener('pointerup', dragEnd); cvs.addEventListener('pointercancel', dragEnd);
@@ -550,6 +550,7 @@ function placePlayer(x, y, dir) {
   P.px = x + 0.5; P.pz = y + 0.5; P.heading = HEAD[P.dir];
   const [bx, by] = DIRS[OPP[P.dir]]; P.trail = [1, 2, 3, 4].map((i) => ({ x: P.px + bx * 0.62 * i, z: P.pz + by * 0.62 * i }));
   P.hist = [{ x, y }, { x, y }, { x, y }, { x, y }, { x, y }, { x, y }];
+  P.camOff = 0; P.uturn = null; P.uturnLock = false;
   if (window.W3D && W3D.setCamYaw) W3D.setCamYaw(P.heading);
 }
 async function runScript(fn) {
@@ -578,18 +579,29 @@ function updateMap(dt) {
     if (Math.abs(nx - n.home.x) > 2 || Math.abs(ny - n.home.y) > 2 || blocked(nx, ny, n)) continue;
     n.fx = n.x; n.fy = n.y; n.x = nx; n.y = ny; n.t = 0; n.moving = true;
   }
+  followCamera(dt);
   P.moving = false;
   if (busy || UI.dialog || UI.menus.length || UI.panel || game.scene !== 'map') return;
   // where does the player want to go? (pad or keys, relative to the camera; or a tapped path)
   let vx = 0, vz = 0;
   const iv = padVec || ((held.up || held.down || held.left || held.right) ? { x: held.right - held.left, y: held.down - held.up } : null);
+  let steered = false;
   if (iv && (iv.x || iv.y)) {
-    const l = Math.hypot(iv.x, iv.y), ix = iv.x / l, iy = iv.y / l, yaw = W3D.getCamYaw();
-    vx = Math.sin(yaw) * -iy + -Math.cos(yaw) * ix; vz = Math.cos(yaw) * -iy + Math.sin(yaw) * ix;
+    // adventure-game steering: up runs forward, left/right turn (and curve while running), down turns you around
+    const l = Math.hypot(iv.x, iv.y), ix = iv.x / l, iy = iv.y / l;
     P.path = []; P.target = null; P.after = null; P.marker = null;
-    // the camera drifts round behind you while you walk forward
-    if (iy < -0.3) { let d = P.heading - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); W3D.setCamYaw(yaw + d * Math.min(1, dt / 1000 * 1.6) * -iy); }
-  } else if (P.target || P.path.length) {
+    if (iy > 0.55 && Math.abs(ix) < 0.6) { if (P.uturn == null && !P.uturnLock) { P.uturn = P.heading + Math.PI; P.uturnLock = true; } }
+    else P.uturnLock = false;
+    if (P.uturn != null) {
+      let d = P.uturn - P.heading; d = Math.atan2(Math.sin(d), Math.cos(d));
+      P.heading += Math.sign(d) * Math.min(Math.abs(d), dt / 1000 * 9); if (Math.abs(d) < 0.05) P.uturn = null;
+    } else P.heading -= ix * (dt / 1000) * 2.9;
+    // pure left/right turns on the spot; up (or down, once turned) runs; diagonals curve
+    const fwd = P.uturn != null ? 0.35 : P.uturnLock ? 1 : Math.max(0, -iy);
+    if (fwd > 0.15) { vx = Math.sin(P.heading) * fwd; vz = Math.cos(P.heading) * fwd; }
+    steered = true;
+  } else { P.uturn = null; P.uturnLock = false; }
+  if (steered) {} else if (P.target || P.path.length) {
     if (!P.target) {
       const d = P.path.shift(), nx = P.x + DIRS[d][0], ny = P.y + DIRS[d][1];
       if (blocked(nx, ny)) { P.path = []; P.after = null; P.marker = null; return; }
@@ -598,18 +610,18 @@ function updateMap(dt) {
     const dx = P.target.x - P.px, dz = P.target.z - P.pz, l = Math.hypot(dx, dz);
     if (l < 0.06) { P.target = null; if (!P.path.length && P.after) { const af = P.after; P.after = null; P.marker = null; if (af.face) { P.dir = af.face; P.heading = HEAD[af.face]; } interact(); } return; }
     vx = dx / l; vz = dz / l;
-    const yaw = W3D.getCamYaw(); let d = Math.atan2(vx, vz) - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); W3D.setCamYaw(yaw + d * Math.min(1, dt / 1000 * 1.2));
+
   } else if (P.after) {
     const af = P.after; P.after = null; P.marker = null; if (af.face) { P.dir = af.face; P.heading = HEAD[af.face]; } interact(); return;
   }
-  if (!vx && !vz) { P.anim = 0; return; }
-  // turn toward the direction of travel, and step forward with collision (sliding along walls)
-  const want = Math.atan2(vx, vz); let dh = want - P.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-  P.heading += dh * Math.min(1, dt / 70);
-  const quarter = Math.round(P.heading / (Math.PI / 2));
-  P.dir = ['down', 'right', 'up', 'left'][((quarter % 4) + 4) % 4];
-  let step = (running() ? 4.1 : 2.4) * dt / 1000;
+  if (!vx && !vz) { P.anim = 0; updateFacing(); return; }
+  // tapped paths: turn toward the next spot. Then step forward with collision (sliding along walls)
+  if (!steered) { const want = Math.atan2(vx, vz); let dh = want - P.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); P.heading += dh * Math.min(1, dt / 70); }
+  updateFacing();
+  let step = (running() ? 4.1 : 2.4) * dt / 1000 * Math.hypot(vx, vz);
   if (P.target) step = Math.min(step, Math.hypot(P.target.x - P.px, P.target.z - P.pz));
+  const l0 = Math.hypot(vx, vz); vx /= l0; vz /= l0;
+
   const ox = P.px, oz = P.pz;
   if (freeAt(P.px + vx * step, P.pz)) P.px += vx * step;
   if (freeAt(P.px, P.pz + vz * step)) P.pz += vz * step;
@@ -626,6 +638,14 @@ function updateMap(dt) {
     onStep();
   }
 }
+// the camera stays behind the hero; a swipe looks around, and that look eases back once you move
+function followCamera(dt) {
+  if (P.moving) P.camOff *= Math.max(0, 1 - dt / 900);
+  const target = P.heading + (P.camOff || 0), yaw = W3D.getCamYaw();
+  let d = target - yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+  W3D.setCamYaw(yaw + d * Math.min(1, dt / 160));
+}
+function updateFacing() { const q = Math.round(P.heading / (Math.PI / 2)); P.dir = ['down', 'right', 'up', 'left'][((q % 4) + 4) % 4]; }
 // is the hero's footprint (a small circle) clear at this spot?
 const FOOT = 0.26;
 function freeAt(x, z) {
