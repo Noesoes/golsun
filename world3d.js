@@ -18,7 +18,7 @@ const FILES = {
   props: ['Chest_Wood', 'Bed_Twin1', 'Bookcase_2', 'Table_Large', 'Chair_1', 'Stool', 'Barrel', 'Barrel_Apples', 'Lantern_Wall', 'Anvil', 'Cauldron', 'Workbench',
     'Potion_1', 'Shelf_Simple', 'Crate_Wooden', 'FarmCrate_Apple', 'CandleStick_Stand', 'Bench', 'Vase_2', 'Pot_1'],
   bld: ['home_A_red', 'home_B_yellow', 'tavern_blue', 'market_green', 'blacksmith_red', 'well_blue', 'windmill_yellow', 'fence_wood_straight', 'waterlily_A', 'waterlily_B', 'sack', 'resource_lumber'],
-  kf: ['Rock_1_A', 'Rock_1_C', 'Rock_1_E', 'Rock_1_J', 'Rock_1_M', 'Rock_3_A', 'Rock_3_C', 'Rock_3_E', 'Rock_3_G', 'Bush_1_A', 'Bush_2_A'],
+  kf: ['Rock_1_A', 'Rock_1_C', 'Rock_1_E', 'Rock_1_J', 'Rock_1_M', 'Rock_3_A', 'Rock_3_C', 'Rock_3_E', 'Rock_3_G', 'Bush_1_A', 'Bush_2_A', 'Tree_4_A', 'Tree_4_B', 'Tree_4_C'],
   cute: ['Alien_Tall', 'Cactus', 'Bee', 'Pig', 'Mushroom', 'Cyclops', 'Bat', 'Ghost', 'YellowDragon'],
   chars: ['Ranger', 'Barbarian', 'Mage', 'Knight', 'Rogue', 'Rogue_Hooded', 'Rig_Medium_General', 'Rig_Medium_MovementBasic'],
 };
@@ -74,8 +74,8 @@ function fluffyTree(seed) {
   for (let b = 0; b < 2; b++) { const bg = new THREE.CylinderGeometry(0.04, 0.07, 0.7, 5); bg.translate(0, 0.35, 0); bg.rotateZ((b ? 1 : -1) * (0.7 + R(10 + b) * 0.3)); bg.rotateY(R(12 + b) * 6.28); bg.translate(lean * 0.6, 1.15 + b * 0.18, 0); parts.push(bg); }
   const trunk = new THREE.Mesh(mergeGeometries(parts.map((g) => g.toNonIndexed())), new THREE.MeshStandardMaterial({ color: 0x7a4b2c, roughness: 1, flatShading: true, name: 'Bark_Fluffy' }));
   // canopy: lumpy clumps around a crown
-  const clumps = [], n = 7 + Math.floor(R(2) * 4), top = 2.25 + R(3) * 0.3;
-  const add = (x, y, z, r) => { const g = new THREE.IcosahedronGeometry(r, 3); g.translate(x, y, z); clumps.push(g); };
+  const clumps = [], n = 8 + Math.floor(R(2) * 3), top = 2.25 + R(3) * 0.3;
+  const add = (x, y, z, r) => { const g = new THREE.IcosahedronGeometry(r, 1); g.translate(x, y, z); clumps.push(g); };
   add(lean, top + 0.35, 0, 0.78 + R(4) * 0.15);
   for (let i = 0; i < n; i++) {
     const a = i / n * Math.PI * 2 + R(20 + i) * 0.6, d = 0.55 + R(30 + i) * 0.35, y = top - 0.2 + R(40 + i) * 0.55 - (i % 3 === 0 ? 0.3 : 0);
@@ -380,22 +380,22 @@ const KF_WIDE = ['kf/Rock_1_A', 'kf/Rock_1_C', 'kf/Rock_1_E'], KF_SLAB = ['kf/Ro
 const kpick = (arr, h) => arr[((h * 97) | 0) % arr.length];
 // past the edge of the playable map, keep the world going: forest, cliff plateaus, the river and roads carry on
 function buildOutskirts(m, def, outdoor) {
-  const g = new THREE.Group(), PAD = 14, items = {}, boxes = [], water = [], roads = [];
-  const add = (k, it) => (items[k] = items[k] || []).push(it);
+  const g = new THREE.Group(), PAD = 11, items = {}, boxes = [], water = [], roads = [];
+  const add = (k, it) => { const ck = k + '|' + Math.floor(it.x / 8) + ',' + Math.floor(it.z / 8); (items[ck] = items[ck] || []).push(it); };
   for (let y = -PAD; y < m.h + PAD; y++) for (let x = -PAD; x < m.w + PAD; x++) {
     if (x >= 0 && y >= 0 && x < m.w && y < m.h) continue;
     const t = m.t[Math.max(0, Math.min(m.h - 1, y))][Math.max(0, Math.min(m.w - 1, x))], h = hash(x + 400, y + 400), h2 = hash(y + 900, x + 77);
-    if (t === 'M' || t === 'v' || t === '#') { boxes.push({ x, y, hgt: t === '#' ? WALLS['#'] : CLIFF_H }); if (outdoor && h < 0.3) add('nature/Pine_' + (1 + ((h * 30) | 0) % 3), { x: x + 0.5, y: CLIFF_H, z: y + 0.5, r: h2 * TAU, s: 0.9 + h2 * 0.5 }); }
+    if (t === 'M' || t === 'v' || t === '#') { boxes.push({ x, y, hgt: t === '#' ? WALLS['#'] : CLIFF_H }); if (outdoor && h < 0.16) add('kf/Tree_4_' + 'ABC'[((h * 30) | 0) % 3], { x: x + 0.5, y: CLIFF_H, z: y + 0.5, r: h2 * TAU, s: 0.9 + h2 * 0.5 }); }
     else if (t === '~' || t === '|') water.push({ x, y });
     else if (t === '=') roads.push({ x, y });
-    else if (outdoor && (t === 'T' || h < 0.12)) { if (h < 0.55) add(h < 0.32 ? 'gen/FluffyTree_' + (((h * 100) | 0) % 4) : 'nature/Pine_' + (1 + ((h * 100) | 0) % 3), { x: x + 0.5 + (h2 - 0.5) * 0.5, z: y + 0.5 + (h - 0.5) * 0.5, r: h2 * TAU, s: 0.85 + h2 * 0.5 }); }
+    else if (outdoor && (t === 'T' || h < 0.12)) { if (h < 0.42 && (x + y) % 2 === 0) add(h < 0.32 ? 'gen/FluffyTree_' + (((h * 100) | 0) % 4) : 'kf/Tree_4_' + 'ABC'[((h * 100) | 0) % 3], { x: x + 0.5 + (h2 - 0.5) * 0.5, z: y + 0.5 + (h - 0.5) * 0.5, r: h2 * TAU, s: 0.85 + h2 * 0.5 }); }
   }
   if (outdoor) {
     const gnd = new THREE.Mesh(new THREE.PlaneGeometry(m.w + PAD * 2 + 40, m.h + PAD * 2 + 40), new THREE.MeshStandardMaterial({ color: 0x5e9a40, map: TEX.ground, roughness: 1 }));
     gnd.rotation.x = -Math.PI / 2; gnd.position.set(m.w / 2, -0.03, m.h / 2); gnd.receiveShadow = true; gnd.userData.own = true; g.add(gnd);
   }
-  const sizes = { FluffyTree: 3.2, Pine: 3.0 };
-  for (const [k, its] of Object.entries(items)) instances(g, k, sizes[k.includes('Fluffy') ? 'FluffyTree' : 'Pine'], 'h', its, { cast: false });
+  const sizes = { FluffyTree: 3.2, Pine: 3.3 };
+  for (const [ck, its] of Object.entries(items)) { const k = ck.split('|')[0]; instances(g, k, sizes[k.includes('Fluffy') ? 'FluffyTree' : 'Pine'], 'h', its, { cast: false }); }
   if (boxes.length) {
     const top = new THREE.MeshStandardMaterial({ color: outdoor ? 0x62a044 : 0x0b0910, map: outdoor ? TEX.ground : null, roughness: 1 }), side = new THREE.MeshStandardMaterial({ color: outdoor ? 0xa89888 : 0x2a2234, map: outdoor ? TEX.rock : null, roughness: 1 });
     for (const hgt of [...new Set(boxes.map((b) => b.hgt))]) {
@@ -436,12 +436,12 @@ function buildMap(m, st) {
     } else if (c === 'T') {
       const deep = [[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => { const t = m.t[y + dy] && m.t[y + dy][x + dx]; return !t || t === 'T'; });
       if (deep && (x + 2 * y) % 3) continue;
-      const k = h < 0.62 ? 'gen/FluffyTree_' + (((h * 100) | 0) % 4) : 'nature/Pine_' + (1 + ((h * 100) | 0) % 3);
+      const k = h < 0.62 ? 'gen/FluffyTree_' + (((h * 100) | 0) % 4) : 'kf/Tree_4_' + 'ABC'[((h * 100) | 0) % 3];
       add(k, { x: cx + (h2 - 0.5) * 0.4, z: cz + (h - 0.5) * 0.4, r, s: (deep ? 1.6 : 1) * (0.85 + h2 * 0.3) });
     } else if (c === 't') add('nature/Bush_Common_Flowers', { x: cx, z: cz, r, s: 1.0 + h * 0.3 });
     else if (c === 'b') { add('nature/Flower_3_Group', { x: cx - 0.2, z: cz, r, s: 1.1 }); add('nature/Flower_4_Group', { x: cx + 0.2, z: cz + 0.15, r, s: 1.1 }); add('nature/Grass_Common_Short', { x: cx, z: cz - 0.2, r, s: 1 }); }
     else if (c === ',') { add('nature/Flower_3_Group', { x: cx - 0.2, z: cz - 0.1, r, s: 1 }); if (h < 0.4) add('nature/Flower_4_Group', { x: cx + 0.22, z: cz + 0.2, r: r + 2, s: 0.8 }); }
-    else if (c === '"') for (let i = 0; i < 4; i++) { const a = hash(x * 5 + i, y * 3 - i); add(i === 0 ? 'nature/Grass_Wispy_Tall' : 'nature/Grass_Common_Tall', { x: cx + (a - 0.5) * 0.85, z: cz + (hash(i, x + y) - 0.5) * 0.85, r: a * TAU, s: 0.8 + a * 0.5 }); }
+    else if (c === '"') for (let i = 0; i < 2; i++) { const a = hash(x * 5 + i, y * 3 - i); add(i === 0 ? 'nature/Grass_Wispy_Tall' : 'nature/Grass_Common_Tall', { x: cx + (a - 0.5) * 0.85, z: cz + (hash(i, x + y) - 0.5) * 0.85, r: a * TAU, s: 0.8 + a * 0.5 }); }
     else if (c === 'r') add(outdoor ? kpick(KF_BOULDER, h) : 'nature/Rock_Medium_2', { x: cx, z: cz, r, s: 0.9 + h * 0.3 });
     else if (c === 'F') add('bld/fence_wood_straight', { x: cx, z: cz, r: (m.t[y][x - 1] === 'F' || m.t[y][x + 1] === 'F') ? Math.PI / 2 : 0, s: 1 });
     else if (c === 'u') add(interior ? 'props/Barrel' : 'props/Barrel_Apples', { x: cx, z: cz, r, s: 1 });
@@ -477,7 +477,7 @@ function buildMap(m, st) {
     if (outdoor && (c === '.' || c === ',' || c === 'b') && h2 > 0.72) blossoms.push({ x: cx + (h - 0.5) * 0.4, z: cz + (h2 - 0.5) * 0.4, r: h * TAU, s: 0.8 + h2 * 0.5 });
     // grass detail on open ground
     if (outdoor && (c === '.' || c === ',')) {
-      if (h < 0.45) add('nature/Grass_Common_Short', { x: cx + (h2 - 0.5) * 0.8, z: cz + (h - 0.5) * 0.8, r, s: 0.7 + h2 * 0.6 });
+      if (h < 0.25) add('nature/Grass_Common_Short', { x: cx + (h2 - 0.5) * 0.8, z: cz + (h - 0.5) * 0.8, r, s: 0.7 + h2 * 0.6 });
       else if (h < 0.53) add('nature/Clover_1', { x: cx, z: cz, r, s: 1 });
       else if (h < 0.56) add('nature/Pebble_Round_' + (h2 < 0.5 ? 1 : 3), { x: cx + 0.2, z: cz - 0.2, r, s: 1 });
       else if (h < 0.58) add('nature/Mushroom_Common', { x: cx, z: cz, r, s: 1 });
@@ -499,11 +499,11 @@ function buildMap(m, st) {
         if (h2 < 0.3) add(kpick(KF_BOULDER, h + h2), { x: cx + 0.3, y: 0, z: cz + 0.95, r, s: 0.55 + h * 0.3 });
       }
       for (const [dx, sx] of [[-1, -0.5], [1, 0.5]]) { const t = m.t[y] && m.t[y][x + dx]; if (t && !(t in WALLS) && t !== 'v' && t !== '~' && h2 < 0.7) add(kpick(KF_SLAB, h + 0.3), { x: cx + sx * 1.05, y: -0.1, z: cz, r, s: 1.3 + h * 0.5 }); }
-      if (!front && h < 0.55) add('nature/Pine_' + (1 + ((h * 30) | 0) % 3), { x: cx + (h2 - 0.5) * 0.5, y: CLIFF_H, z: cz, r, s: 1 + h2 * 0.5 });
+      if (!front && h < 0.55) add('kf/Tree_4_' + 'ABC'[((h * 30) | 0) % 3], { x: cx + (h2 - 0.5) * 0.5, y: CLIFF_H, z: cz, r, s: 1 + h2 * 0.5 });
       else if (h > 0.8) add('nature/Bush_Common_Flowers', { x: cx, y: CLIFF_H, z: cz, r, s: 0.9 });
     }
   }
-  const SIZES = { FluffyTree: [3.2, 'h'], CommonTree: [3.1, 'h'], Pine: [3.0, 'h'], Bush_Common: [1.0, 'w'], Bush_Common_Flowers: [0.95, 'w'], Flower_3_Group: [0.5, 'h'], Flower_4_Group: [0.5, 'h'],
+  const SIZES = { FluffyTree: [3.2, 'h'], Tree_4: [3.3, 'h'], CommonTree: [3.1, 'h'], Pine: [3.0, 'h'], Bush_Common: [1.0, 'w'], Bush_Common_Flowers: [0.95, 'w'], Flower_3_Group: [0.5, 'h'], Flower_4_Group: [0.5, 'h'],
     Grass_Wispy_Tall: [0.55, 'h'], Grass_Common_Tall: [0.5, 'h'], Grass_Common_Short: [0.28, 'h'], Clover_1: [0.35, 'w'], Pebble_Round: [0.25, 'w'], Mushroom_Common: [0.28, 'h'], Mushroom_Laetiporus: [0.45, 'h'],
     Fern_1: [0.6, 'w'], Rock_Medium: [0.75, 'w'], Rock_1: [1.0, 'w'], Rock_3: [0.85, 'w'], Bush_1: [1.0, 'w'], Bush_2: [1.1, 'w'], fence_wood_straight: [1.0, 'd'], Barrel: [0.55, 'h'], Barrel_Apples: [0.55, 'h'], Crate_Wooden: [0.45, 'h'], Plant_7: [0.8, 'h'], Pot_1: [0.4, 'h'],
     Bookcase_2: [1.9, 'h'], Table_Large: [1.1, 'w'], Stool: [0.45, 'h'], Bed_Twin1: [1.0, 'w'], Workbench: [1.0, 'w'] };
@@ -763,7 +763,8 @@ function syncMap(dt, S) {
   camTarget.set(px, 0, pz);
   if (camera.fov !== 52) { camera.fov = 52; camera.updateProjectionMatrix(); }
   camera.lookAt(px + fx * 2.0, 0.5, pz + fz * 2.0);
-  if (scene.fog && mapInfo.outdoor) { scene.fog.near = 16; scene.fog.far = 44; }
+  if (scene.fog && mapInfo.outdoor) { scene.fog.near = 14; scene.fog.far = 36; }
+  const far = interior ? 30 : mapInfo.cave ? 32 : 38; if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
   sun.position.set(px + fx * 5 - 6, 14, pz + fz * 5 + 5); sun.target.position.set(px + fx * 5, 0, pz + fz * 5);
   // lights in caves / interiors
   playerLight.position.set(px, 2.2, pz);
@@ -856,7 +857,7 @@ function buildArena(kind) {
   if (field) {
     // a sunny forest clearing
     const trees = scatter(46, 10, { w: 40, z0: -19, z1: -6, rx: 1, rz: 1 }).concat(scatter(10, 11, { w: 30, z0: -6, z1: 2, rx: 9.5, rz: 9 }));
-    const tk = ['gen/FluffyTree_0', 'gen/FluffyTree_1', 'gen/FluffyTree_2', 'gen/FluffyTree_3', 'gen/FluffyTree_0', 'nature/Pine_1', 'nature/Pine_2', 'gen/FluffyTree_2'];
+    const tk = ['gen/FluffyTree_0', 'gen/FluffyTree_1', 'gen/FluffyTree_2', 'gen/FluffyTree_3', 'gen/FluffyTree_0', 'kf/Tree_4_A', 'kf/Tree_4_B', 'gen/FluffyTree_2'];
     tk.forEach((k, j) => instances(arena, k, 3.6, 'h', trees.filter((_, i) => i % tk.length === j).map((t) => ({ ...t, s: 0.85 + R(t.x * 10 | 0, 3) * 0.6 }))));
     instances(arena, 'nature/Bush_Common_Flowers', 1.1, 'w', scatter(16, 20, { w: 26, z0: -7, z1: 1.5, s0: 0.9, s1: 0.6 }));
     instances(arena, 'nature/Bush_Common', 1.1, 'w', scatter(4, 21, { w: 26, z0: -8, z1: -3, s0: 0.9, s1: 0.4 }), { tint: 0xc0e0a0 });
@@ -1044,7 +1045,7 @@ function addWind(mat, k) {
   };
   mat.customProgramCacheKey = () => 'wind' + k;
 }
-const WIND = [[/^gen\/FluffyTree/, 0.03], [/^nature\/(CommonTree|Pine|TwistedTree|DeadTree)/, 0.035], [/^nature\/Bush/, 0.06], [/^nature\/(Grass|Flower|Fern|Clover|Plant)/, 0.22]];
+const WIND = [[/^gen\/FluffyTree/, 0.03], [/^kf\/Tree/, 0.03], [/^nature\/(CommonTree|Pine|TwistedTree|DeadTree)/, 0.035], [/^nature\/Bush/, 0.06], [/^nature\/(Grass|Flower|Fern|Clover|Plant)/, 0.22]];
 function setupWind() {
   for (const [key, g] of Object.entries(G)) {
     const w = WIND.find(([re]) => re.test(key)); if (!w) continue;
@@ -1186,5 +1187,5 @@ function toScreen(wx, wy, wz) { return project(camera, wx, wy, wz); }
 function tileChanged(m, st) { if (mapInfo && m.id === mapInfo.id) { rebuildDynamic(m, st); setCaveLight(st); } }
 function hideActors() { for (const a of actors.values()) a.obj.visible = false; }
 
-window.W3D = { getCamYaw, setCamYaw, figure, setQuality, init, load, resize, buildMap, syncMap, render, pickTile, toScreen, tileChanged, resetCamera, battleStart, battleSync, battleEnd, enemyScreen, titleSync, portrait, hideActors, setCaveLight, ENEMY_MODEL };
+window.W3D = { _info: () => { const t = {}; scene.traverse((o) => { if (o.isMesh && o.visible) { const n = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); const k = (o.material.name || o.material.type) + (o.isInstancedMesh ? '' : '*'); t[k] = (t[k] || 0) + n; } }); return JSON.stringify(Object.entries(t).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => k + ':' + Math.round(v / 1000) + 'k')); }, getCamYaw, setCamYaw, figure, setQuality, init, load, resize, buildMap, syncMap, render, pickTile, toScreen, tileChanged, resetCamera, battleStart, battleSync, battleEnd, enemyScreen, titleSync, portrait, hideActors, setCaveLight, ENEMY_MODEL };
 window.__w3dReady && window.__w3dReady();
