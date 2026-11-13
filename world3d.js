@@ -50,6 +50,7 @@ async function load(onProgress) {
   await Promise.all([0, 1, 2, 3, 4, 5].map(worker));
   for (const k of ['chars/Rig_Medium_General', 'chars/Rig_Medium_MovementBasic']) for (const c of G[k].animations) CLIPS[c.name] = c;
   for (const g of Object.values(G)) g.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material && o.material.map) o.material.map.anisotropy = 4; } });
+  for (const [k, g] of Object.entries(G)) if (k.startsWith('props/')) g.scene.traverse((o) => { if (o.isMesh && o.material.metalness > 0.3) { o.material.metalness = 0.15; o.material.roughness = Math.max(0.6, o.material.roughness); } });
   for (let i = 0; i < 4; i++) G['gen/FluffyTree_' + i] = { scene: fluffyTree(i), animations: [] };
   setupWind();
 }
@@ -172,6 +173,12 @@ function makeTextures() {
       g.fillStyle = '#9a3a3a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#e8c070'; g.lineWidth = 3; g.strokeRect(5, 5, w - 10, h - 10);
       g.fillStyle = '#e8c070'; for (let i = 0; i < 4; i++) { g.save(); g.translate(w / 2, h / 2); g.rotate(i * Math.PI / 2); g.fillRect(-3, -14, 6, 6); g.restore(); }
     }, false),
+    cave: canvasTex(256, 256, (g, w, h) => {
+      g.fillStyle = '#b4acb8'; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 90; i++) { const v = 130 + rnd() * 110 | 0; g.fillStyle = `rgba(${v},${v - 6},${v + 6},0.5)`; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 10 + rnd() * 30, 6 + rnd() * 18, rnd() * 3, 0, 6.3); g.fill(); }
+      for (let i = 0; i < 26; i++) { g.strokeStyle = `rgba(30,22,40,${0.3 + rnd() * 0.35})`; g.lineWidth = 1 + rnd() * 1.5; let x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (rnd() - 0.5) * 26; y += 6 + rnd() * 16; g.lineTo(x, y); } g.stroke(); }
+      for (let i = 0; i < 700; i++) { const v = rnd() * 255 | 0; g.fillStyle = `rgba(${v},${v},${v},0.1)`; g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 3, 2 + rnd() * 3); }
+    }),
     rock: canvasTex(256, 256, (g, w, h) => {
       g.fillStyle = '#b8b0a4'; g.fillRect(0, 0, w, h);
       for (let y = 0; y < h;) { const bh = 10 + rnd() * 26, v = 150 + rnd() * 70 | 0; g.fillStyle = `rgb(${v},${v - 6},${v - 14})`; g.fillRect(0, y, w, bh); g.fillStyle = 'rgba(40,30,25,0.45)'; g.fillRect(0, y + bh - 2, w, 2); y += bh; }
@@ -296,8 +303,8 @@ function buildWalls(m, def) {
     const tl = corner(x, y), tr = corner(x + 1, y), bl = corner(x, y + 1), br = corner(x + 1, y + 1);
     const topC = cave ? [0.09, 0.07, 0.12] : interior ? [0.36, 0.24, 0.16] : (col.setHex(hash(x, y) < 0.5 ? 0x5e9a40 : 0x6aa646), [col.r, col.g, col.b]);
     quad(cave ? V : interior ? S : T, tl, bl, br, tr, topC, topC); // counter-clockwise from above, so the top faces up
-    const sideTop = cave ? [0.55, 0.48, 0.6] : interior ? [0.93, 0.88, 0.76] : [0.95, 0.86, 0.72];
-    const sideBot = cave ? [0.26, 0.22, 0.3] : interior ? [0.55, 0.38, 0.24] : [0.55, 0.46, 0.38];
+    const sideTop = cave ? [0.1, 0.08, 0.14] : interior ? [0.93, 0.88, 0.76] : [0.95, 0.86, 0.72];
+    const sideBot = cave ? [0.62, 0.54, 0.7] : interior ? [0.55, 0.38, 0.24] : [0.55, 0.46, 0.38];
     const down = (p) => [p[0], -0.6, p[2]];
     const o = interior || cave ? S : S;
     if (!isWall(x, y + 1)) quad(o, br, bl, down(bl), down(br), sideTop, sideBot);
@@ -326,7 +333,7 @@ function buildWalls(m, def) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(V.P, 3));
     const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x0b0910 })); mesh.userData.own = true; grp.add(mesh);
   }
-  mk(S, outdoor ? TEX.rock : TEX.ground, outdoor);
+  mk(S, outdoor ? TEX.rock : def.ground === '_' ? TEX.cave : TEX.ground, outdoor || def.ground === '_');
   return grp.children.length ? grp : null;
 }
 function caveMouth() {
@@ -669,7 +676,7 @@ function actor(id, who) {
   let a = actors.get(id);
   if (!a) {
     const c = castOf(who);
-    a = makeActor(c[0], c[1], c[2], c[3]); a.obj.scale.setScalar(MAP_SCALE); actors.set(id, a); scene.add(a.obj);
+    a = makeActor(c[0], c[1], c[2], c[3]); a.obj.scale.setScalar(mapInfo && mapInfo.interior ? 0.95 : MAP_SCALE); actors.set(id, a); scene.add(a.obj);
   }
   return a;
 }
@@ -706,10 +713,12 @@ function syncMap(dt, S) {
     if (i === 0) { a.obj.position.set(px, 0, pz); a.rotTarget = P.heading; }
     else {
       // walk a little to either side of the trail so the camera can see past them
-      const t = trailPoint(P, 0.55 + i * 0.55), l = Math.hypot(t.hx, t.hz) || 1, side = (i % 2 ? 1 : -1) * 0.38;
-      a.obj.position.set(t.x + (t.hz / l) * side, 0, t.z - (t.hx / l) * side);
+      const sc = mapInfo.interior ? 1.5 : 1, t = trailPoint(P, [0, 0.5, 0.5, 1.0][i] * sc), l = Math.hypot(t.hx, t.hz) || 1, side = [0, 0.85, -0.85, 1.6][i] * sc;
+      let fx2 = t.x + (t.hz / l) * side, fz2 = t.z - (t.hx / l) * side;
+      if (solidHeight(fx2, fz2) > 0 || WATERISH.has(mapInfo.t[Math.floor(fz2)] && mapInfo.t[Math.floor(fz2)][Math.floor(fx2)])) { fx2 = t.x; fz2 = t.z; } // no room: fall in behind
+      a.obj.position.set(fx2, 0, fz2);
       // fade out anyone standing right in front of the camera
-      a.obj.visible = Math.hypot(camera.position.x - a.obj.position.x, camera.position.z - a.obj.position.z) > 1.1;
+      a.obj.visible = !mapInfo.interior && Math.hypot(camera.position.x - a.obj.position.x, camera.position.z - a.obj.position.z) > 1.5; // indoors only the leader is shown: the rooms are small
       if (t.hx || t.hz) a.rotTarget = Math.atan2(t.hx, t.hz);
     }
     playAct(a, P.moving ? 'Running_A' : 'Idle_A', 0.1);
@@ -727,6 +736,13 @@ function syncMap(dt, S) {
     const a = actor(id + '|' + sheetOf(n.who), n.who); ids.add(id + '|' + sheetOf(n.who));
     a.obj.position.set(x, 0, z); a.rotTarget = DIR_ROT[n.dir]; a.obj.visible = true;
     playAct(a, n.moving ? 'Walking_A' : 'Idle_A');
+  }
+  for (const r of cur.roamers || []) {
+    const id = 'roam_' + r.uid; ids.add(id);
+    let a = actors.get(id);
+    if (!a) { const model = ENEMY_MODEL[ENEMIES[r.kind].shape] || 'Alien_Tall', mo = monsterObj(model, ENEMY_H[model] * 0.62); a = { obj: mo.obj, mixer: mo.mixer, mon: mo }; actors.set(id, a); scene.add(a.obj); tintMonster(mo, ENEMIES[r.kind].shape); a.obj.rotation.y = r.heading; }
+    a.obj.visible = true; a.rotTarget = r.heading;
+    a.obj.position.set(r.x, (ENEMIES[r.kind].float ? 0.28 + Math.sin(T / 300 + r.uid) * 0.06 : 0) + (r.state === 'chase' ? Math.abs(Math.sin(T / 110)) * 0.08 : 0), r.z);
   }
   for (const [id, a] of actors) {
     if (!ids.has(id)) { a.obj.visible = false; continue; }
@@ -749,20 +765,22 @@ function syncMap(dt, S) {
   // camera: behind the hero's shoulder, pulled in when a wall or building is in the way
   const interior = mapInfo.interior;
   const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
-  const want = interior ? 3.0 : 4.4, rise = interior ? 1.8 : 1.75, headY = 0.62;
+  const want = interior ? 5.2 : 5.4, rise = interior ? 3.6 : 3.0, headY = interior ? 0.95 : 0.62;
+  FX.hero.value.set(px, headY, pz);
   let free = want;
   for (let s2 = 0.45; s2 <= want; s2 += 0.15) {
     const x = px - fx * s2, z = pz - fz * s2, y = headY + rise * (s2 / want);
-    if (solidHeight(x, z) > y - 0.1) { free = Math.max(0.5, s2 - 0.3); break; }
+    if (solidHeight(x, z) > y - 0.1) { free = Math.max(0.9, s2 - 0.3); break; }
   }
   camDist += (free - camDist) * Math.min(1, dt / (free < camDist ? 40 : 260));
   const k = camDist / want;
-  const goal = new THREE.Vector3(px - fx * camDist, headY + rise * k + 0.35 * (1 - k), pz - fz * camDist);
+  // when a wall pushes the camera in, it rises to look down over the hero instead of pressing against their back
+  const goal = new THREE.Vector3(px - fx * camDist, headY + rise * (0.55 + 0.45 * k), pz - fz * camDist);
   if (!camInit) { camera.position.copy(goal); camInit = true; }
   else camera.position.lerp(goal, Math.min(1, dt / 45));
   camTarget.set(px, 0, pz);
   if (camera.fov !== 52) { camera.fov = 52; camera.updateProjectionMatrix(); }
-  camera.lookAt(px + fx * 2.0, 0.5, pz + fz * 2.0);
+  camera.lookAt(px + fx * 1.5, interior ? 0.9 : 0.6, pz + fz * 1.5);
   if (scene.fog && mapInfo.outdoor) { scene.fog.near = 14; scene.fog.far = 36; }
   const far = interior ? 30 : mapInfo.cave ? 32 : 38; if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
   sun.position.set(px + fx * 5 - 6, 14, pz + fz * 5 + 5); sun.target.position.set(px + fx * 5, 0, pz + fz * 5);
@@ -1021,13 +1039,17 @@ function figure(who) {
 
 
 // ------------------------------------------------------------------ polish: wind, water, post-processing
-const FX = { time: { value: 0 }, quality: 'high', post: null };
+const FX = { time: { value: 0 }, hero: { value: new THREE.Vector3(0, -99, 0) }, quality: 'high', post: null };
 // sway foliage in the wind: vertices move more the higher they are above the plant's base
-function addWind(mat, k) {
+function addWind(mat, k, see) {
   if (mat.userData.wind) return; mat.userData.wind = k;
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = FX.time;
-    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+    sh.uniforms.uTime = FX.time; sh.uniforms.uHero = FX.hero;
+    // leaves that come between the camera and the hero dissolve, so trees never hide your character
+    if (see) sh.fragmentShader = 'uniform vec3 uHero; varying vec3 vSeeW;\n' + sh.fragmentShader.replace('void main() {', `void main() {
+      vec3 toF = vSeeW - cameraPosition, toH = uHero - cameraPosition; float dF = length( toF ), dH = length( toH );
+      float a = 1.0 - smoothstep( 1.6, 3.2, dF ); if ( dF < dH - 0.35 ) a = max( a, smoothstep( 0.95, 0.988, dot( toF / dF, toH / dH ) ) ); { if ( a > 0.02 && a > fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) ) discard; }`);
+    sh.vertexShader = 'uniform float uTime; varying vec3 vSeeW;\n' + sh.vertexShader.replace('#include <project_vertex>', `
       vec4 wPos = vec4( transformed, 1.0 );
       #ifdef USE_INSTANCING
         wPos = instanceMatrix * wPos;
@@ -1040,16 +1062,17 @@ function addWind(mat, k) {
       float ph = uTime * 1.7 + wPos.x * 0.35 + wPos.z * 0.27;
       float gust = 0.65 + 0.35 * sin( uTime * 0.45 + wPos.x * 0.08 );
       wPos.xz += vec2( sin( ph ), cos( ph * 0.83 ) * 0.5 ) * wH * ${k.toFixed(3)} * gust;
+      vSeeW = wPos.xyz;
       vec4 mvPosition = viewMatrix * wPos;
       gl_Position = projectionMatrix * mvPosition;`);
   };
-  mat.customProgramCacheKey = () => 'wind' + k;
+  mat.customProgramCacheKey = () => 'wind' + k + (see ? 's' : '');
 }
 const WIND = [[/^gen\/FluffyTree/, 0.03], [/^kf\/Tree/, 0.03], [/^nature\/(CommonTree|Pine|TwistedTree|DeadTree)/, 0.035], [/^nature\/Bush/, 0.06], [/^nature\/(Grass|Flower|Fern|Clover|Plant)/, 0.22]];
 function setupWind() {
   for (const [key, g] of Object.entries(G)) {
     const w = WIND.find(([re]) => re.test(key)); if (!w) continue;
-    g.scene.traverse((o) => { if (o.isMesh && !/bark|trunk|wood/i.test(o.material.name || '')) { addWind(o.material, w[1]); if (/Tree|Pine|Bush/.test(key) && !o.material.userData.lush) { o.material.userData.lush = true; o.material.color.multiplyScalar(1.38); } } });
+    g.scene.traverse((o) => { if (o.isMesh && !/bark|trunk|wood/i.test(o.material.name || '')) { addWind(o.material, w[1], /Tree|Pine|Bush/.test(key)); if (/Tree|Pine|Bush/.test(key) && !o.material.userData.lush) { o.material.userData.lush = true; o.material.color.multiplyScalar(1.38); } } });
   }
 }
 // rivers and ponds: depth colour, shoreline foam, ripples and glints

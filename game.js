@@ -530,7 +530,7 @@ function syncNpcs() {
 }
 function tileAt(x, y) { if (x < 0 || y < 0 || x >= cur.w || y >= cur.h) return ' '; return cur.t[y][x]; }
 function setTile(x, y, c) {
-  cur.t[y][x] = c; (state.mods[cur.id] = state.mods[cur.id] || {})[x + ',' + y] = c;
+  cur.t[y][x] = c; (state.mods[cur.id] = state.mods[cur.id] || {})[x + ',' + y] = c; cur.mmVer = (cur.mmVer || 0) + 1;
   if (window.W3D) W3D.tileChanged(cur, state);
   for (let yy = y - 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + 1; xx++) if (xx >= 0 && yy >= 0 && xx < cur.w && yy < cur.h) cur.mask[yy][xx] = maskAt(xx, yy);
 }
@@ -582,6 +582,7 @@ function updateMap(dt) {
   followCamera(dt);
   P.moving = false;
   if (busy || UI.dialog || UI.menus.length || UI.panel || game.scene !== 'map') return;
+  updateRoamers(dt); if (busy) return;
   // where does the player want to go? (pad or keys, relative to the camera; or a tapped path)
   let vx = 0, vz = 0;
   const iv = padVec || ((held.up || held.down || held.left || held.right) ? { x: held.right - held.left, y: held.down - held.up } : null);
@@ -618,7 +619,7 @@ function updateMap(dt) {
   // tapped paths: turn toward the next spot. Then step forward with collision (sliding along walls)
   if (!steered) { const want = Math.atan2(vx, vz); let dh = want - P.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); P.heading += dh * Math.min(1, dt / 70); }
   updateFacing();
-  let step = (running() ? 4.1 : 2.4) * dt / 1000 * Math.hypot(vx, vz);
+  let step = (running() ? 4.1 : 2.4) * (cur.def.interior ? 1.25 : 1) * dt / 1000 * Math.hypot(vx, vz);
   if (P.target) step = Math.min(step, Math.hypot(P.target.x - P.px, P.target.z - P.pz));
   const l0 = Math.hypot(vx, vz); vx /= l0; vz /= l0;
 
@@ -670,11 +671,66 @@ function onStep() {
   const w = (cur.def.warps || []).find((w) => w.x === P.x && w.y === P.y);
   if (w) { runScript(() => warp(w.to, w.tx, w.ty, w.dir)); return; }
   if (cur.def.onStep) { const s = cur.def.onStep(P.x, P.y); if (s) { runScript(s); return; } }
-  if (cur.def.enc) {
-    const tc = tileAt(P.x, P.y);
-    const ok = cur.def.encTall ? tc === '"' : !['X', '%', 'o'].includes(tc);
-    if (ok && --encSteps <= 0) { encSteps = cur.def.encTall ? ri(5, 12) : ri(14, 24); runScript(randomBattle); }
+}
+// ---------- roaming monsters: you can see them, dodge them, or run straight at them ----------
+let roamUid = 0;
+function roamOk(x, z) {
+  const tx = Math.floor(x), ty = Math.floor(z);
+  if (tx < 1 || ty < 1 || tx >= cur.w - 1 || ty >= cur.h - 1 || solidTile(tx, ty)) return false;
+  if ('%o|XvDp'.includes(tileAt(tx, ty))) return false;
+  if (cur.id === 'grotto' && ty <= 6) return false; // the Rootwell chamber belongs to the boss
+  return !(cur.def.warps || []).some((w) => Math.abs(w.x - tx) + Math.abs(w.y - ty) < 3);
+}
+function spawnRoamers() {
+  cur.roamers = [];
+  if (!cur.def.enc) return;
+  const spots = [];
+  for (let y = 1; y < cur.h - 1; y++) for (let x = 1; x < cur.w - 1; x++) {
+    if (cur.def.encTall && cur.t[y][x] !== '"') continue;
+    if (!roamOk(x + 0.5, y + 0.5) || Math.hypot(x + 0.5 - P.px, y + 0.5 - P.pz) < 6) continue;
+    if (cur.npcs.some((n) => Math.hypot(n.x - x, n.y - y) < 3)) continue;
+    spots.push([x, y]);
   }
+  const want = cur.def.encTall ? 8 : 7;
+  for (let i = 0; i < want && spots.length; i++) {
+    const [x, y] = spots.splice(ri(0, spots.length - 1), 1)[0];
+    if (cur.roamers.some((r) => Math.hypot(r.hx - x, r.hz - y) < 3.5)) { i--; if (spots.length < 3) break; continue; }
+    const group = pick(ENCOUNTERS[cur.def.enc]);
+    cur.roamers.push({ uid: ++roamUid, kind: group[0], group, x: x + 0.5, z: y + 0.5, hx: x + 0.5, hz: y + 0.5, tx: x + 0.5, tz: y + 0.5, heading: rand(0, 6.28), state: 'idle', wait: rand(500, 2500) });
+  }
+}
+function updateRoamers(dt) {
+  if (!cur.roamers) spawnRoamers();
+  const calm = window.NO_ROAM;
+  for (const r of cur.roamers) {
+    const dp = Math.hypot(P.px - r.x, P.pz - r.z), dh = Math.hypot(r.x - r.hx, r.z - r.hz);
+    if (r.state === 'dazed') { r.wait -= dt; if (r.wait <= 0) r.state = 'idle'; continue; }
+    if (!calm && dp < 0.75) { startRoamFight(r); return; }
+    if (!calm && r.state !== 'chase' && dp < 4.2 && dh < 6) { r.state = 'chase'; r.alert = 700; sfx('cursor'); }
+    if (r.state === 'chase' && (calm || dp > 6.5 || dh > 8)) { r.state = 'idle'; r.wait = 600; r.tx = r.hx; r.tz = r.hz; }
+    r.alert = Math.max(0, (r.alert || 0) - dt);
+    let gx = r.tx, gz = r.tz, sp = 0.9;
+    if (r.state === 'chase') { gx = P.px; gz = P.pz; sp = r.alert > 0 ? 0 : 2.9; }
+    else if (Math.hypot(gx - r.x, gz - r.z) < 0.1) {
+      r.wait -= dt; if (r.wait > 0) continue;
+      r.wait = rand(900, 3200); const a = rand(0, 6.28), d = rand(0.8, 2.4), nx = r.hx + Math.cos(a) * d, nz = r.hz + Math.sin(a) * d;
+      if (roamOk(nx, nz)) { r.tx = nx; r.tz = nz; } continue;
+    }
+    const dx = gx - r.x, dz = gz - r.z, l = Math.hypot(dx, dz) || 1, st = Math.min(l, sp * dt / 1000);
+    let want = Math.atan2(dx, dz) - r.heading; want = Math.atan2(Math.sin(want), Math.cos(want)); r.heading += want * Math.min(1, dt / 120);
+    const nx = r.x + dx / l * st, nz = r.z + dz / l * st;
+    if (roamOk(nx, r.z)) r.x = nx; else if (r.state !== 'chase') { r.tx = r.x; r.tz = r.z; }
+    if (roamOk(r.x, nz)) r.z = nz; else if (r.state !== 'chase') { r.tx = r.x; r.tz = r.z; }
+  }
+}
+function startRoamFight(r) {
+  runScript(async () => {
+    P.heading = Math.atan2(r.x - P.px, r.z - P.pz);
+    const res = await fight(r.group, { bg: cur.def.bg });
+    if (!cur.roamers) return; // lost and woke up at the inn
+    if (res === 'win') cur.roamers = cur.roamers.filter((q) => q !== r);
+    else { r.state = 'dazed'; r.wait = 3500; } // got away: it needs a moment before it can chase again
+  });
 }
 async function randomBattle() { await fight(pick(ENCOUNTERS[cur.def.enc]), { bg: cur.def.bg }); }
 
@@ -870,6 +926,10 @@ function renderMap() {
     const sp = W3D.toScreen(P.marker.x + 0.5, 0.05, P.marker.y + 0.5), r = 9 + Math.sin(T / 150) * 1.5;
     bx.strokeStyle = 'rgba(255,242,192,0.9)'; bx.lineWidth = 1.5; bx.beginPath(); bx.ellipse(sp.x, sp.y, r, r * 0.55, 0, 0, 6.3); bx.stroke();
   }
+  for (const r of cur.roamers || []) if (r.alert > 0 || r.state === 'chase') {
+    const sp = W3D.toScreen(r.x, 1.0, r.z); if (sp.z > 1) continue;
+    font(12, true); bx.font = 'bold 12px ' + FONT; bx.textAlign = 'center'; bx.fillStyle = OUTLINE_COL; bx.fillText('!', sp.x + 1, sp.y + 1); bx.fillStyle = '#ff5a4a'; bx.fillText('!', sp.x, sp.y); bx.textAlign = 'left';
+  }
   const f = !busy && !UI.dialog && !UI.menus.length && !P.path.length && !P.target ? facingTarget() : null;
   if (f) {
     const sp = f.kind === 'talk' && f.n ? W3D.toScreen(f.n.fx + (f.n.x - f.n.fx) * f.n.t + 0.5, 1.15, f.n.fy + (f.n.y - f.n.fy) * f.n.t + 0.5) : W3D.toScreen(f.x + 0.5, 0.95, f.y + 0.5);
@@ -893,18 +953,70 @@ function ambient(cx, cy) {
     fx.push(p);
   }
 }
+// ---------- minimap & goal marker ----------
+const MM = { key: '', cv: null, px: 4 };
+function goalSpot() {
+  const f = state.flags;
+  const t = !f.metGran ? ['gran', 6, 3] : !f.grottoIntro ? ['grotto', 11, 24] : !f.tamsinJoined ? ['grotto', 2, 11] : !f.bossDead ? ['grotto', 11, 4] : !f.springSings ? ['grotto', 11, 1] : null;
+  if (!t) return null;
+  if (t[0] === cur.id) return { x: t[1], y: t[2] };
+  // not on this map: head for the exit that leads toward it
+  const next = { gran: { village: 'gran' }, grotto: { village: 'field', field: 'grotto' } }[t[0]][cur.id] || 'village';
+  const w = (cur.def.warps || []).find((w) => w.to === next) || (cur.def.warps || [])[0];
+  return w ? { x: w.x, y: w.y } : null;
+}
+function minimapCanvas() {
+  const key = cur.id + '|' + (cur.mmVer || 0);
+  if (MM.key === key) return MM.cv;
+  const s = MM.px, [c, g] = ART.mk(cur.w * s, cur.h * s), d = cur.def, cave = d.ground === '_', inside = d.ground === 'W';
+  for (let y = 0; y < cur.h; y++) for (let x = 0; x < cur.w; x++) {
+    const t = cur.t[y][x];
+    let col = cave ? '#9a8a80' : inside ? '#c89a64' : '#86c060';
+    if ('~'.includes(t)) col = '#4aa8cc'; else if ('%o|'.includes(t)) col = '#d8c898'; else if (t === '=') col = '#e0cc9a'; else if (t === '"') col = '#5e9e44';
+    else if (t === 'T' || t === 't') col = '#2f6238'; else if (t === 'M' || t === '#' || t === 'Q' || t === 'v') col = cave || inside ? '#3a3040' : '#7a7068';
+    else if (solidTile(x, y)) col = (t === 'H' || t === 'R') ? '#b05a3a' : cave ? '#5e5258' : '#5a7a4a';
+    g.fillStyle = col; g.fillRect(x * s, y * s, s, s);
+  }
+  g.fillStyle = '#ffe070'; for (const w of d.warps || []) g.fillRect(w.x * s, w.y * s, s, s);
+  MM.key = key; MM.cv = c; return c;
+}
+function drawMinimap() {
+  const size = 58, x0 = W - size - 5, y0 = 5, s = MM.px, cv = minimapCanvas();
+  box(x0 - 3, y0 - 3, size + 6, size + 8);
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, size, size); ctx.clip();
+  ctx.fillStyle = cur.def.ground === '.' ? '#2f6238' : '#1a1420'; ctx.fillRect(x0, y0, size, size);
+  const ox = x0 + size / 2 - P.px * s, oy = y0 + size / 2 - P.pz * s;
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(cv, ox, oy);
+  for (const n of cur.npcs) { ctx.fillStyle = n.enemy ? '#c050e0' : '#ffffff'; ctx.fillRect(ox + (n.fx + (n.x - n.fx) * n.t) * s, oy + (n.fy + (n.y - n.fy) * n.t) * s, s, s); }
+  for (const r of cur.roamers || []) { ctx.fillStyle = '#e04848'; ctx.fillRect(ox + r.x * s - 1.5, oy + r.z * s - 1.5, 3, 3); }
+  ctx.restore();
+  // goal marker, pinned to the edge when it is off the little map
+  const gs = goalSpot();
+  if (gs) {
+    let gx = ox + (gs.x + 0.5) * s, gy = oy + (gs.y + 0.5) * s; const m = 4;
+    gx = clamp(gx, x0 + m, x0 + size - m); gy = clamp(gy, y0 + m, y0 + size - m);
+    const r = 3 + Math.sin(T / 200) * 0.8;
+    poly([gx, gy - r, gx + r, gy, gx, gy + r, gx - r, gy], '#3a2a10'); poly([gx, gy - r + 1, gx + r - 1, gy, gx, gy + r - 1, gx - r + 1, gy], COL.gold);
+  }
+  // you: an arrow pointing the way you face
+  const cx = x0 + size / 2, cy = y0 + size / 2, hx = Math.sin(P.heading), hy = Math.cos(P.heading);
+  const tri = (k, col) => poly([cx + hx * 5 * k, cy + hy * 5 * k, cx - hx * 3 * k - hy * 3.2 * k, cy - hy * 3 * k + hx * 3.2 * k, cx - hx * 3 * k + hy * 3.2 * k, cy - hy * 3 * k - hx * 3.2 * k], col);
+  tri(1.3, '#3a2a4a'); tri(1, '#ffffff');
+}
 function drawMapHUD() {
+  if (!UI.menus.length && !UI.panel && !(UI.dialog && UI.dialog.pages)) drawMinimap();
   if (UI.banner) {
     const b = UI.banner, a = clamp(Math.min(b.t / 400, (2600 - b.t) / 300), 0, 1);
     ctx.globalAlpha = a; font(11, true); const w = ctx.measureText(b.text).width + 30;
     box((W - w) / 2, 6, w, 24, { dark: true }); text(b.text, W / 2, 22, '#ffd36a', 'center');
     ctx.globalAlpha = 1;
   } else if (!UI.dialog && !UI.menus.length && !busy && !UI.toast) {
-    font(8); const g = goalText(), w = Math.min(W - 8, ctx.measureText(g).width + 20);
+    font(8); const g = goalText(), w = Math.min(W - 76, ctx.measureText(g).width + 20);
     ctx.globalAlpha = UI.goalT > 0 ? 1 : 0.82;
-    box(4, 3, w + 4, 20);
+    const gl = wrap(g, w - 18);
+    box(4, 3, w + 4, 10 + gl.length * 10);
     poly([11, 9, 14, 12.5, 11, 16, 8, 12.5], COL.gold);
-    text(g, 18, 16, COL.text);
+    gl.forEach((l, i) => text(l, 18, 16 + i * 10, COL.text));
     ctx.globalAlpha = 1;
   }
 }
